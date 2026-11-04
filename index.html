@@ -9,14 +9,13 @@
   <style>
     :root {
       --bg: #050508;
-      --card: rgba(18,18,22,0.85);
+      --card: rgba(18,18,22,0.9);
       --border: #2a2a32;
       --text: #f0f0f5;
       --muted: #9a9aaa;
       --accent: #00ff9d;
       --accent-dark: #00cc7a;
       --danger: #ff5c5c;
-      --glow: 0 0 40px rgba(0,255,157,0.15);
     }
     * { box-sizing: border-box; }
     body {
@@ -25,25 +24,8 @@
       background: var(--bg);
       color: var(--text);
       min-height: 100vh;
-      position: relative;
-      overflow-x: hidden;
     }
-    body::before {
-      content: '';
-      position: fixed;
-      inset: 0;
-      background:
-        radial-gradient(ellipse 80% 50% at 50% -20%, rgba(0,255,157,0.12), transparent),
-        radial-gradient(ellipse 60% 40% at 100% 100%, rgba(0,180,255,0.08), transparent);
-      pointer-events: none;
-      z-index: 0;
-      animation: pulse 12s ease-in-out infinite alternate;
-    }
-    @keyframes pulse {
-      0% { opacity: 0.6; }
-      100% { opacity: 1; }
-    }
-    .container { max-width: 980px; margin: 0 auto; padding: 28px 16px 60px; position: relative; z-index: 1; }
+    .container { max-width: 980px; margin: 0 auto; padding: 28px 16px 60px; }
     header { text-align: center; margin-bottom: 28px; }
     h1 {
       font-size: clamp(2rem, 5vw, 2.8rem);
@@ -66,8 +48,6 @@
       border-radius: 16px;
       padding: 20px;
       text-align: center;
-      backdrop-filter: blur(10px);
-      box-shadow: var(--glow);
     }
     .stat-value { font-size: 2rem; font-weight: 800; color: var(--accent); }
     .stat-label { font-size: 0.9rem; color: var(--muted); margin-top: 4px; }
@@ -77,7 +57,6 @@
       border-radius: 18px;
       padding: 22px;
       margin-bottom: 18px;
-      backdrop-filter: blur(12px);
     }
     button {
       background: var(--accent);
@@ -88,16 +67,14 @@
       border-radius: 10px;
       cursor: pointer;
       font-size: 0.95rem;
-      transition: all 0.15s ease;
     }
-    button:hover:not(:disabled) { background: var(--accent-dark); transform: translateY(-1px); }
+    button:hover:not(:disabled) { background: var(--accent-dark); }
     button:disabled { opacity: 0.4; cursor: not-allowed; }
     button.secondary {
       background: #1c1c22;
       color: var(--text);
       border: 1px solid var(--border);
     }
-    button.danger { background: var(--danger); color: #fff; }
     .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
     textarea {
       background: #0c0c10;
@@ -108,7 +85,6 @@
       width: 100%;
       font-family: inherit;
       min-height: 110px;
-      resize: vertical;
     }
     .log {
       background: #08080b;
@@ -142,15 +118,9 @@
       width: 0%;
       transition: width 0.35s ease;
     }
-    .guide {
-      background: linear-gradient(180deg, rgba(0,255,157,0.04), transparent);
-      border: 1px solid #1f3a2e;
-    }
-    .guide ol { margin: 10px 0 0 20px; padding: 0; }
-    .guide li { margin: 6px 0; }
+    .guide { border-color: #1f3a2e; }
     footer { text-align: center; color: var(--muted); font-size: 0.85rem; margin-top: 36px; }
     a { color: var(--accent); text-decoration: none; }
-    a:hover { text-decoration: underline; }
   </style>
 </head>
 <body>
@@ -179,19 +149,17 @@
     </div>
 
     <div class="card guide">
-      <h3 style="margin:0 0 10px;">How it works (for beginners)</h3>
-      <p style="margin:0 0 8px; color:var(--muted);">Every time you receive a token on Solana, a small account is created that locks ~0.002 SOL as rent. When the account is empty, that SOL is still locked until you close it.</p>
-      <ol>
-        <li><strong>Connect</strong> your Phantom wallet (we never see your keys).</li>
-        <li>Click <strong>Scan Wallet</strong> to find empty accounts and tiny dust balances.</li>
-        <li>Click <strong>Reclaim All</strong>. Confirm in Phantom. Your SOL returns to your wallet.</li>
+      <h3 style="margin:0 0 10px;">How it works</h3>
+      <p style="margin:0 0 8px; color:var(--muted);">Every token account locks ~0.002 SOL as rent. When empty, close it to get the SOL back.</p>
+      <ol style="margin:10px 0 0 20px; padding:0;">
+        <li><strong>Connect</strong> Phantom (keys never leave your browser).</li>
+        <li>Scan runs automatically and shows reclaimable SOL.</li>
+        <li>Click <strong>Reclaim All</strong> and confirm in Phantom.</li>
       </ol>
-      <p style="margin:10px 0 0; font-size:0.9rem; color:var(--muted);">Safe · You only approve the exact transactions · 0% fee forever.</p>
     </div>
 
     <div class="card">
       <h3 style="margin-top:0;">Multi-Wallet Scan <span class="badge">Read-only</span></h3>
-      <p style="margin:0 0 10px; color:var(--muted); font-size:0.9rem;">Paste any public addresses (one per line) to check reclaimable SOL without connecting.</p>
       <textarea id="addresses" placeholder="Paste public keys, one per line"></textarea>
       <div class="row" style="margin-top:10px;">
         <button id="scanMulti" class="secondary">Scan Addresses</button>
@@ -199,12 +167,8 @@
       <div id="multiResults" style="margin-top:14px;"></div>
     </div>
 
-    <div class="card">
-      <p style="margin:0;"><strong>0% fee forever.</strong> Non-custodial · Open source · Supports Token Program + Token-2022</p>
-    </div>
-
     <footer>
-      <a href="https://github.com/robinnnn0101-ship-it/vex-inclinator" target="_blank">GitHub</a> · Built for the public
+      <a href="https://github.com/robinnnn0101-ship-it/vex-inclinator" target="_blank">GitHub</a> · 0% fee forever
     </footer>
   </div>
 
@@ -219,10 +183,12 @@
     const TOKEN_2022_PROGRAM_ID = new PublicKey('TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb');
 
     const RPCS = [
+      'https://public.rpc.solanavibestation.com',
+      'https://rpc.solanatracker.io/public',
+      'https://solana.drpc.org',
+      'https://solana-mainnet.gateway.tatum.io',
       'https://solana-rpc.publicnode.com',
-      'https://api.mainnet-beta.solana.com',
-      'https://solana.api.onfinality.io/public',
-      'https://rpc.ankr.com/solana'
+      'https://api.mainnet-beta.solana.com'
     ];
 
     let connection = new Connection(RPCS[0], 'confirmed');
@@ -250,7 +216,7 @@
           return await fn();
         } catch (e) {
           if (i === RPCS.length - 1) throw e;
-          log(`RPC ${RPCS[i].split('//')[1].split('/')[0]} failed, trying next...`);
+          log(`Trying next RPC...`);
         }
       }
     }
@@ -302,6 +268,23 @@
       document.getElementById('statSOL').textContent = '0.000';
     }
 
+    // Proper Phantom state
+    if (window.solana?.isPhantom) {
+      window.solana.on('connect', (pub) => {
+        setConnected(pub);
+        log('Wallet connected');
+        document.getElementById('scan').click();
+      });
+      window.solana.on('disconnect', () => {
+        setDisconnected();
+        log('Wallet disconnected');
+      });
+      if (window.solana.isConnected && window.solana.publicKey) {
+        setConnected(window.solana.publicKey);
+        setTimeout(() => document.getElementById('scan').click(), 500);
+      }
+    }
+
     connectBtn.onclick = async () => {
       if (!window.solana?.isPhantom) {
         alert('Install Phantom wallet first');
@@ -309,16 +292,12 @@
         return;
       }
       try {
-        const resp = await window.solana.connect();
-        setConnected(resp.publicKey);
-        log('Wallet connected');
+        await window.solana.connect();
       } catch (e) { log('Connect failed: ' + (e.message || e)); }
     };
 
     disconnectBtn.onclick = async () => {
       try { await window.solana.disconnect(); } catch {}
-      setDisconnected();
-      log('Wallet disconnected');
     };
 
     async function getAccounts(owner) {
@@ -350,7 +329,7 @@
     document.getElementById('scan').onclick = async () => {
       if (!wallet) return;
       log('Scanning wallet...');
-      setProgress(15);
+      setProgress(20);
       try {
         const { empties, dusts } = await getAccounts(wallet);
         emptyAccounts = empties;
@@ -360,9 +339,9 @@
         document.getElementById('statDust').textContent = dusts.length;
         document.getElementById('statSOL').textContent = (totalLamports / 1e9).toFixed(4);
         document.getElementById('reclaimAll').disabled = empties.length + dusts.length === 0;
-        log(`Found ${empties.length} empty + ${dusts.length} dust accounts`);
+        log(`Found ${empties.length} empty + ${dusts.length} dust → ${(totalLamports / 1e9).toFixed(4)} SOL`);
         setProgress(100);
-        setTimeout(() => setProgress(0), 900);
+        setTimeout(() => setProgress(0), 800);
       } catch (e) {
         log('Scan error: ' + (e.message || e));
         setProgress(0);
@@ -380,7 +359,7 @@
         tx.recentBlockhash = blockhash;
         try {
           const signed = await window.solana.signTransaction(tx);
-          const sig = await connection.sendRawTransaction(signed.serialize(), { skipPreflight: false });
+          const sig = await connection.sendRawTransaction(signed.serialize());
           await connection.confirmTransaction(sig, 'confirmed');
           log(`${label} batch ${Math.floor(i/BATCH)+1} confirmed`);
         } catch (e) {
@@ -392,7 +371,7 @@
 
     document.getElementById('reclaimAll').onclick = async () => {
       if (!wallet || (emptyAccounts.length + dustAccounts.length === 0)) return;
-      if (!confirm('This will burn dust tokens and close empty accounts. This is permanent. Continue?')) return;
+      if (!confirm('Burn dust and close empty accounts? This is permanent.')) return;
 
       log('Starting reclaim...');
       setProgress(10);
@@ -412,7 +391,7 @@
         }
 
         log('Done. SOL reclaimed (0% fee).');
-        setTimeout(() => document.getElementById('scan').click(), 1200);
+        setTimeout(() => document.getElementById('scan').click(), 1500);
       } catch (e) {
         log('Reclaim stopped');
         setProgress(0);
@@ -433,7 +412,7 @@
           const total = empties.reduce((s, a) => s + a.lamports, 0);
           html += `<div>${line.slice(0,6)}...${line.slice(-4)} → ${empties.length} empty → ${(total/1e9).toFixed(4)} SOL</div>`;
         } catch (e) {
-          html += `<div style='color:#ff5c5c'>${line.slice(0,20)}... → invalid or RPC error</div>`;
+          html += `<div style='color:#ff5c5c'>${line.slice(0,24)}... → error</div>`;
         }
       }
       out.innerHTML = html + '</div>';
