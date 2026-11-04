@@ -9,7 +9,7 @@
   <style>
     :root {
       --bg: #050508;
-      --card: rgba(18,18,22,0.9);
+      --card: rgba(18,18,22,0.92);
       --border: #2a2a32;
       --text: #f0f0f5;
       --muted: #9a9aaa;
@@ -24,18 +24,64 @@
       background: var(--bg);
       color: var(--text);
       min-height: 100vh;
+      position: relative;
+      overflow-x: hidden;
     }
-    .container { max-width: 980px; margin: 0 auto; padding: 28px 16px 60px; }
-    header { text-align: center; margin-bottom: 28px; }
-    h1 {
-      font-size: clamp(2rem, 5vw, 2.8rem);
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 70% 50% at 20% -10%, rgba(0,255,157,0.08), transparent),
+        radial-gradient(ellipse 50% 40% at 100% 100%, rgba(0,180,255,0.06), transparent);
+      pointer-events: none;
+      animation: glow 10s ease-in-out infinite alternate;
+      z-index: 0;
+    }
+    @keyframes glow {
+      0% { opacity: 0.5; }
+      100% { opacity: 1; }
+    }
+    .container { max-width: 980px; margin: 0 auto; padding: 20px 16px 60px; position: relative; z-index: 1; }
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 28px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid #1a1a20;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .logo {
+      width: 42px;
+      height: 42px;
+      background: linear-gradient(135deg, #00ff9d, #00cc7a);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      box-shadow: 0 0 20px rgba(0,255,157,0.3);
+      animation: float 4s ease-in-out infinite;
+    }
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-4px); }
+    }
+    .brand-text h1 {
+      font-size: 1.6rem;
       margin: 0;
       background: linear-gradient(90deg, var(--accent), #00d4ff);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       font-weight: 800;
     }
-    .subtitle { color: var(--muted); margin: 8px 0 0; font-size: 1.05rem; }
+    .brand-text .sub { font-size: 0.75rem; color: var(--muted); margin: 0; }
+    .wallet-controls { display: flex; gap: 8px; align-items: center; }
     .stats {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -48,7 +94,9 @@
       border-radius: 16px;
       padding: 20px;
       text-align: center;
+      transition: transform 0.2s, box-shadow 0.2s;
     }
+    .stat:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(0,255,157,0.1); }
     .stat-value { font-size: 2rem; font-weight: 800; color: var(--accent); }
     .stat-label { font-size: 0.9rem; color: var(--muted); margin-top: 4px; }
     .card {
@@ -57,18 +105,20 @@
       border-radius: 18px;
       padding: 22px;
       margin-bottom: 18px;
+      backdrop-filter: blur(8px);
     }
     button {
       background: var(--accent);
       color: #000;
       border: none;
-      padding: 12px 22px;
+      padding: 10px 18px;
       font-weight: 700;
       border-radius: 10px;
       cursor: pointer;
-      font-size: 0.95rem;
+      font-size: 0.9rem;
+      transition: all 0.15s;
     }
-    button:hover:not(:disabled) { background: var(--accent-dark); }
+    button:hover:not(:disabled) { background: var(--accent-dark); transform: translateY(-1px); }
     button:disabled { opacity: 0.4; cursor: not-allowed; }
     button.secondary {
       background: #1c1c22;
@@ -128,10 +178,20 @@
 </head>
 <body>
   <div class="container">
-    <header>
-      <h1>🔥 VexInclinator</h1>
-      <p class="subtitle">Reclaim locked SOL from empty token accounts · 0% fee · Non-custodial</p>
-    </header>
+    <div class="topbar">
+      <div class="brand">
+        <div class="logo">🔥</div>
+        <div class="brand-text">
+          <h1>VexInclinator</h1>
+          <p class="sub">Vexlore Ecosystem · 0% Fee</p>
+        </div>
+      </div>
+      <div class="wallet-controls">
+        <span id="wallet" class="badge">Not connected</span>
+        <button id="connect">Connect Phantom</button>
+        <button id="disconnect" class="secondary" style="display:none;">Disconnect</button>
+      </div>
+    </div>
 
     <div class="stats">
       <div class="stat"><div class="stat-value" id="statAccounts">—</div><div class="stat-label">Empty Accounts</div></div>
@@ -141,9 +201,6 @@
 
     <div class="card">
       <div class="row">
-        <button id="connect">Connect Phantom</button>
-        <button id="disconnect" class="secondary" style="display:none;">Disconnect</button>
-        <span id="wallet" class="badge">Not connected</span>
         <button id="scan" class="secondary" disabled>Scan Wallet</button>
         <button id="reclaimAll" disabled>Reclaim All (0% fee)</button>
       </div>
@@ -178,7 +235,7 @@
     </div>
 
     <footer>
-      <a href="https://github.com/robinnnn0101-ship-it/vex-inclinator" target="_blank">GitHub</a> · 0% fee forever
+      <a href="https://github.com/robinnnn0101-ship-it/vex-inclinator" target="_blank">GitHub</a> · Part of Vexlore · 0% fee forever
     </footer>
   </div>
 
