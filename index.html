@@ -6,7 +6,6 @@
   <title>VexInclinator — Zero Fee Solana Cleaner</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔥</text></svg>">
   <script src="https://unpkg.com/@solana/web3.js@1.95.3/lib/index.iife.min.js"></script>
-  <script src="https://unpkg.com/@solana/spl-token@0.4.8/lib/index.iife.min.js"></script>
   <style>
     :root {
       --bg: #07070a;
@@ -19,7 +18,7 @@
       --danger: #ff4d4d;
     }
     * { box-sizing: border-box; }
-    body { margin: 0; font-family: 'Inter', system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; }
+    body { margin: 0; font-family: system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; }
     .container { max-width: 960px; margin: 0 auto; padding: 24px 16px; }
     header { text-align: center; margin-bottom: 32px; }
     h1 { font-size: 2.4rem; margin: 0; background: linear-gradient(90deg, var(--accent), #00d4ff); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
@@ -36,13 +35,11 @@
     button:hover:not(:disabled) { background: var(--accent-dark); transform: translateY(-1px); }
     button:disabled { opacity: 0.45; cursor: not-allowed; }
     button.secondary { background: #222; color: var(--text); border: 1px solid var(--border); }
-    button.danger { background: var(--danger); color: #fff; }
     .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
-    input, textarea {
+    textarea {
       background: #0d0d10; border: 1px solid var(--border); color: var(--text);
-      padding: 10px 12px; border-radius: 8px; width: 100%; font-family: inherit;
+      padding: 10px 12px; border-radius: 8px; width: 100%; font-family: inherit; min-height: 100px;
     }
-    textarea { min-height: 100px; resize: vertical; }
     .log { background: #0a0a0c; border-radius: 8px; padding: 12px; font-family: monospace; font-size: 0.85rem; max-height: 220px; overflow-y: auto; color: #aaa; }
     .badge { display: inline-block; background: #1a1a1e; padding: 4px 10px; border-radius: 999px; font-size: 0.75rem; color: var(--muted); }
     .progress { height: 6px; background: #222; border-radius: 3px; margin: 10px 0; overflow: hidden; }
@@ -86,7 +83,7 @@
 
     <div class="card">
       <p style="margin:0;"><strong>0% fee forever.</strong> Non-custodial · Your keys never leave Phantom · Open source</p>
-      <p style="margin:8px 0 0; color:var(--muted); font-size:0.9rem;">Supports classic Token Program + Token-2022. Closes empty accounts, burns dust, withdraws excess rent.</p>
+      <p style="margin:8px 0 0; color:var(--muted); font-size:0.9rem;">Supports classic Token Program + Token-2022. Closes empty accounts and burns dust.</p>
     </div>
 
     <footer>
@@ -95,33 +92,71 @@
   </div>
 
   <script>
-    const { Connection, PublicKey, Transaction, TransactionInstruction, SystemProgram } = solanaWeb3;
-    const { TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID, createCloseAccountInstruction, createBurnInstruction } = splToken;
+    if (typeof solanaWeb3 === 'undefined') {
+      document.getElementById('log').innerHTML = '<div style="color:#ff4d4d">Error: Solana web3.js failed to load. Refresh the page.</div>';
+    }
 
-    const connection = new Connection("https://api.mainnet-beta.solana.com", "confirmed");
+    const { Connection, PublicKey, Transaction, TransactionInstruction } = solanaWeb3;
+
+    const TOKEN_PROGRAM_ID = new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA');
+    const TOKEN_2022_PROGRAM_ID = new PublicKey('TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb');
+
+    const connection = new Connection('https://api.mainnet-beta.solana.com', 'confirmed');
     let wallet = null;
     let emptyAccounts = [];
     let dustAccounts = [];
 
-    const logEl = document.getElementById("log");
-    const progressEl = document.getElementById("progress");
+    const logEl = document.getElementById('log');
+    const progressEl = document.getElementById('progress');
 
     function log(msg) {
       logEl.innerHTML += `<div>${new Date().toLocaleTimeString()} — ${msg}</div>`;
       logEl.scrollTop = logEl.scrollHeight;
     }
 
-    function setProgress(pct) { progressEl.style.width = pct + "%"; }
+    function setProgress(pct) { progressEl.style.width = pct + '%'; }
 
-    document.getElementById("connect").onclick = async () => {
-      if (!window.solana?.isPhantom) return alert("Install Phantom wallet");
+    // Manual instruction builders (no spl-token dependency)
+    function createCloseAccountInstruction(account, destination, owner, programId) {
+      return new TransactionInstruction({
+        programId,
+        keys: [
+          { pubkey: account, isSigner: false, isWritable: true },
+          { pubkey: destination, isSigner: false, isWritable: true },
+          { pubkey: owner, isSigner: true, isWritable: false }
+        ],
+        data: Buffer.from([9]) // CloseAccount discriminator
+      });
+    }
+
+    function createBurnInstruction(account, mint, owner, amount, programId) {
+      const data = Buffer.alloc(9);
+      data.writeUInt8(8, 0); // Burn discriminator
+      data.writeBigUInt64LE(BigInt(amount), 1);
+      return new TransactionInstruction({
+        programId,
+        keys: [
+          { pubkey: account, isSigner: false, isWritable: true },
+          { pubkey: mint, isSigner: false, isWritable: true },
+          { pubkey: owner, isSigner: true, isWritable: false }
+        ],
+        data
+      });
+    }
+
+    document.getElementById('connect').onclick = async () => {
+      if (!window.solana?.isPhantom) {
+        alert('Install Phantom wallet');
+        window.open('https://phantom.app/', '_blank');
+        return;
+      }
       try {
         const resp = await window.solana.connect();
         wallet = resp.publicKey;
-        document.getElementById("wallet").textContent = wallet.toString().slice(0, 4) + "..." + wallet.toString().slice(-4);
-        document.getElementById("scan").disabled = false;
-        log("Wallet connected");
-      } catch (e) { log("Connect failed: " + e.message); }
+        document.getElementById('wallet').textContent = wallet.toString().slice(0, 4) + '...' + wallet.toString().slice(-4);
+        document.getElementById('scan').disabled = false;
+        log('Wallet connected');
+      } catch (e) { log('Connect failed: ' + e.message); }
     };
 
     async function getAccounts(owner) {
@@ -139,33 +174,32 @@
             programId,
             lamports: acc.account.lamports,
             amount,
-            ui,
-            decimals: info.tokenAmount.decimals
+            ui
           };
           if (amount === 0n) empties.push(item);
-          else if (ui < 1 && ui > 0) dusts.push(item); // dust threshold
+          else if (ui > 0 && ui < 1) dusts.push(item);
         }
       }
       return { empties, dusts };
     }
 
-    document.getElementById("scan").onclick = async () => {
+    document.getElementById('scan').onclick = async () => {
       if (!wallet) return;
-      log("Scanning wallet...");
+      log('Scanning wallet...');
       setProgress(10);
       try {
         const { empties, dusts } = await getAccounts(wallet);
         emptyAccounts = empties;
         dustAccounts = dusts;
         const totalLamports = empties.reduce((s, a) => s + a.lamports, 0);
-        document.getElementById("statAccounts").textContent = empties.length;
-        document.getElementById("statDust").textContent = dusts.length;
-        document.getElementById("statSOL").textContent = (totalLamports / 1e9).toFixed(4);
-        document.getElementById("reclaimAll").disabled = empties.length + dusts.length === 0;
+        document.getElementById('statAccounts').textContent = empties.length;
+        document.getElementById('statDust').textContent = dusts.length;
+        document.getElementById('statSOL').textContent = (totalLamports / 1e9).toFixed(4);
+        document.getElementById('reclaimAll').disabled = empties.length + dusts.length === 0;
         log(`Found ${empties.length} empty + ${dusts.length} dust accounts`);
         setProgress(100);
         setTimeout(() => setProgress(0), 800);
-      } catch (e) { log("Scan error: " + e.message); }
+      } catch (e) { log('Scan error: ' + e.message); }
     };
 
     async function sendBatches(instructionsList, label) {
@@ -179,7 +213,7 @@
         try {
           const signed = await window.solana.signTransaction(tx);
           const sig = await connection.sendRawTransaction(signed.serialize());
-          await connection.confirmTransaction(sig, "confirmed");
+          await connection.confirmTransaction(sig, 'confirmed');
           log(`${label} batch ${Math.floor(i/BATCH)+1} confirmed: ${sig.slice(0,8)}...`);
         } catch (e) {
           log(`${label} batch failed: ${e.message}`);
@@ -188,58 +222,39 @@
       }
     }
 
-    document.getElementById("reclaimAll").onclick = async () => {
+    document.getElementById('reclaimAll').onclick = async () => {
       if (!wallet || (emptyAccounts.length + dustAccounts.length === 0)) return;
-      if (!confirm("This will burn dust tokens and close empty accounts. Permanent. Continue?")) return;
+      if (!confirm('This will burn dust tokens and close empty accounts. Permanent. Continue?')) return;
 
-      log("Starting reclaim...");
+      log('Starting reclaim...');
       setProgress(5);
 
-      // First burn dust
       if (dustAccounts.length) {
-        const burnIxs = dustAccounts.map(a => createBurnInstruction(
-          a.pubkey, a.mint, wallet, a.amount, [], a.programId
-        ));
+        const burnIxs = dustAccounts.map(a => createBurnInstruction(a.pubkey, a.mint, wallet, a.amount, a.programId));
         try {
-          await sendBatches(burnIxs, "Burn dust");
+          await sendBatches(burnIxs, 'Burn dust');
           setProgress(40);
-        } catch (e) { log("Dust burn stopped"); return; }
+        } catch (e) { log('Dust burn stopped'); return; }
       }
 
-      // Then close empties (and previously dust after burn)
       const allToClose = [...emptyAccounts, ...dustAccounts];
       if (allToClose.length) {
-        const closeIxs = allToClose.map(a => createCloseAccountInstruction(
-          a.pubkey, wallet, wallet, [], a.programId
-        ));
+        const closeIxs = allToClose.map(a => createCloseAccountInstruction(a.pubkey, wallet, wallet, a.programId));
         try {
-          await sendBatches(closeIxs, "Close accounts");
+          await sendBatches(closeIxs, 'Close accounts');
           setProgress(100);
-        } catch (e) { log("Close stopped"); return; }
+        } catch (e) { log('Close stopped'); return; }
       }
 
-      log("All done. SOL reclaimed (0% fee).");
-      setTimeout(() => document.getElementById("scan").click(), 1000);
+      log('All done. SOL reclaimed (0% fee).');
+      setTimeout(() => document.getElementById('scan').click(), 1000);
     };
 
-    // Excess withdraw helper (discriminator 38)
-    function createWithdrawExcessIx(source, dest, authority, programId) {
-      return new TransactionInstruction({
-        programId,
-        keys: [
-          { pubkey: source, isSigner: false, isWritable: true },
-          { pubkey: dest, isSigner: false, isWritable: true },
-          { pubkey: authority, isSigner: true, isWritable: false }
-        ],
-        data: Buffer.from([38])
-      });
-    }
-
-    document.getElementById("scanMulti").onclick = async () => {
-      const text = document.getElementById("addresses").value;
+    document.getElementById('scanMulti').onclick = async () => {
+      const text = document.getElementById('addresses').value;
       const lines = text.split(/\n+/).map(l => l.trim()).filter(Boolean);
-      const out = document.getElementById("multiResults");
-      out.innerHTML = "Scanning...";
+      const out = document.getElementById('multiResults');
+      out.innerHTML = 'Scanning...';
       let html = "<div style='font-family:monospace;font-size:0.9rem;'>";
       for (const line of lines) {
         try {
@@ -249,7 +264,7 @@
           html += `<div>${line.slice(0,6)}...${line.slice(-4)} → ${empties.length} empty → ${(total/1e9).toFixed(4)} SOL</div>`;
         } catch { html += `<div style='color:#ff4d4d'>${line} → invalid</div>`; }
       }
-      out.innerHTML = html + "</div>" || "No addresses";
+      out.innerHTML = html + '</div>' || 'No addresses';
     };
   </script>
 </body>
