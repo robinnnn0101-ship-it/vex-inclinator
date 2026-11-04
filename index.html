@@ -5,10 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>VexInclinator — Reclaim Locked SOL (0% Fee)</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔥</text></svg>">
-  <script src="https://unpkg.com/buffer@6.0.3/index.js"></script>
-  <script>
-    window.Buffer = buffer.Buffer;
-  </script>
   <script src="https://unpkg.com/@solana/web3.js@1.95.3/lib/index.iife.min.js"></script>
   <style>
     :root {
@@ -172,6 +168,20 @@
       width: 0%;
       transition: width 0.35s ease;
     }
+    .token-list {
+      max-height: 220px;
+      overflow-y: auto;
+      margin: 10px 0;
+      font-size: 0.85rem;
+    }
+    .token-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 0;
+      border-bottom: 1px solid #1a1a20;
+    }
+    .token-item input { accent-color: var(--accent); }
     .guide { border-color: #1f3a2e; }
     .leaderboard { border-color: #2a2a1f; }
     .lb-item { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #1a1a20; font-size: 0.9rem; }
@@ -206,9 +216,10 @@
     <div class="card">
       <div class="row">
         <button id="scan" class="secondary" disabled>Scan Wallet</button>
-        <button id="reclaimAll" disabled>Reclaim All (0% fee)</button>
+        <button id="reclaimAll" disabled>Reclaim Selected (0% fee)</button>
       </div>
       <div class="progress"><div class="progress-bar" id="progress"></div></div>
+      <div id="tokenList" class="token-list" style="display:none;"></div>
       <div id="log" class="log" style="margin-top:14px;">Ready. Connect your wallet to start.</div>
     </div>
 
@@ -218,7 +229,7 @@
       <ol style="margin:10px 0 0 20px; padding:0;">
         <li><strong>Connect</strong> Phantom (keys never leave your browser).</li>
         <li>Scan runs automatically and shows reclaimable SOL.</li>
-        <li>Click <strong>Reclaim All</strong> and confirm in Phantom.</li>
+        <li>Uncheck any tokens you want to keep, then click <strong>Reclaim Selected</strong>.</li>
       </ol>
     </div>
 
@@ -274,6 +285,7 @@
     const disconnectBtn = document.getElementById('disconnect');
     const walletBadge = document.getElementById('wallet');
     const lbList = document.getElementById('leaderboardList');
+    const tokenListEl = document.getElementById('tokenList');
 
     function log(msg) {
       logEl.innerHTML += `<div>${new Date().toLocaleTimeString()} — ${msg}</div>`;
@@ -346,14 +358,15 @@
           { pubkey: destination, isSigner: false, isWritable: true },
           { pubkey: owner, isSigner: true, isWritable: false }
         ],
-        data: Buffer.from([9])
+        data: new Uint8Array([9])
       });
     }
 
     function createBurnInstruction(account, mint, owner, amount, programId) {
-      const data = Buffer.alloc(9);
-      data.writeUInt8(8, 0);
-      data.writeBigUInt64LE(BigInt(amount), 1);
+      const data = new Uint8Array(9);
+      data[0] = 8;
+      const view = new DataView(data.buffer);
+      view.setBigUint64(1, BigInt(amount), true);
       return new TransactionInstruction({
         programId,
         keys: [
@@ -383,6 +396,8 @@
       document.getElementById('statAccounts').textContent = '—';
       document.getElementById('statDust').textContent = '—';
       document.getElementById('statSOL').textContent = '0.000';
+      tokenListEl.style.display = 'none';
+      tokenListEl.innerHTML = '';
     }
 
     if (window.solana?.isPhantom) {
@@ -432,7 +447,8 @@
               programId,
               lamports: acc.account.lamports,
               amount,
-              ui
+              ui,
+              selected: true
             };
             if (amount === 0n) empties.push(item);
             else if (ui > 0 && ui < 1) dusts.push(item);
@@ -441,6 +457,32 @@
         return { empties, dusts };
       });
     }
+
+    function renderTokenList() {
+      const all = [...emptyAccounts, ...dustAccounts];
+      if (!all.length) {
+        tokenListEl.style.display = 'none';
+        return;
+      }
+      tokenListEl.style.display = 'block';
+      tokenListEl.innerHTML = all.map((a, i) => {
+        const short = a.pubkey.toString().slice(0,4) + '...' + a.pubkey.toString().slice(-4);
+        const type = a.amount === 0n ? 'Empty' : 'Dust';
+        const sol = (a.lamports / 1e9).toFixed(4);
+        return `<div class="token-item">
+          <input type="checkbox" id="tok${i}" checked data-index="${i}" onchange="window.updateSelection()">
+          <label for="tok${i}">${short} · ${type} · ${sol} SOL</label>
+        </div>`;
+      }).join('');
+    }
+
+    window.updateSelection = function() {
+      const checks = tokenListEl.querySelectorAll('input[type=checkbox]');
+      const all = [...emptyAccounts, ...dustAccounts];
+      checks.forEach((cb, i) => {
+        if (all[i]) all[i].selected = cb.checked;
+      });
+    };
 
     document.getElementById('scan').onclick = async () => {
       if (!wallet) return;
@@ -456,6 +498,7 @@
         document.getElementById('statDust').textContent = dusts.length;
         document.getElementById('statSOL').textContent = lastReclaimAmount.toFixed(4);
         document.getElementById('reclaimAll').disabled = empties.length + dusts.length === 0;
+        renderTokenList();
         log(`Found ${empties.length} empty + ${dusts.length} dust → ${lastReclaimAmount.toFixed(4)} SOL`);
         setProgress(100);
         setTimeout(() => setProgress(0), 800);
@@ -498,29 +541,36 @@
     }
 
     document.getElementById('reclaimAll').onclick = async () => {
-      if (!wallet || (emptyAccounts.length + dustAccounts.length === 0)) return;
-      if (!confirm('Burn dust and close empty accounts? This is permanent.')) return;
+      if (!wallet) return;
+      const selectedDust = dustAccounts.filter(a => a.selected);
+      const selectedEmpty = emptyAccounts.filter(a => a.selected);
+      if (selectedDust.length + selectedEmpty.length === 0) {
+        alert('Nothing selected');
+        return;
+      }
+      if (!confirm('Burn selected dust and close selected empty accounts? This is permanent.')) return;
 
       log('Starting reclaim...');
       setProgress(10);
 
       try {
-        if (dustAccounts.length) {
-          const burnIxs = dustAccounts.map(a => createBurnInstruction(a.pubkey, a.mint, wallet, a.amount, a.programId));
+        if (selectedDust.length) {
+          const burnIxs = selectedDust.map(a => createBurnInstruction(a.pubkey, a.mint, wallet, a.amount, a.programId));
           await sendBatches(burnIxs, 'Burn dust');
           setProgress(45);
         }
 
-        const allToClose = [...emptyAccounts, ...dustAccounts];
+        const allToClose = [...selectedEmpty, ...selectedDust];
         if (allToClose.length) {
           const closeIxs = allToClose.map(a => createCloseAccountInstruction(a.pubkey, wallet, wallet, a.programId));
           await sendBatches(closeIxs, 'Close accounts');
           setProgress(100);
         }
 
-        if (wallet && lastReclaimAmount > 0) {
-          recordClaim(wallet.toString(), lastReclaimAmount);
-          log(`Recorded ${lastReclaimAmount.toFixed(4)} SOL on leaderboard`);
+        const reclaimed = selectedEmpty.reduce((s, a) => s + a.lamports, 0) / 1e9;
+        if (wallet && reclaimed > 0) {
+          recordClaim(wallet.toString(), reclaimed);
+          log(`Recorded ${reclaimed.toFixed(4)} SOL on leaderboard`);
         }
 
         log('Done. SOL reclaimed (0% fee).');
