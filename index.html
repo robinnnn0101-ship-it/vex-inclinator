@@ -256,12 +256,13 @@
     <div id="how" class="card guide">
       <h3 style="margin:0 0 10px;">How it works</h3>
       <p style="margin:0 0 8px; color:var(--muted);">Every time you buy or swap a token on Solana, a tiny account is created that locks about <strong>0.002 SOL</strong> as rent. If you trade even 2–3 tokens a day or week, those leftover accounts stay on-chain and the SOL stays locked forever — until you close them.</p>
-      <p style="margin:0 0 10px; color:var(--muted);">This tool finds those empty accounts (and tiny dust), lets you choose which ones to close, and sends the locked SOL straight back to your wallet. Zero fee. Keys never leave your browser.</p>
+      <p style="margin:0 0 10px; color:var(--muted);">This tool only closes accounts that have exactly zero tokens. It never transfers, approves, or burns any token. Keys never leave your browser. Zero fee.</p>
       <ol style="margin:10px 0 0 20px; padding:0;">
         <li><strong>Connect</strong> Phantom.</li>
-        <li>Scan shows everything that can be reclaimed.</li>
+        <li>Scan shows empty accounts that can be closed.</li>
         <li>Uncheck anything you want to keep, then click <strong>Reclaim Selected</strong> and confirm in Phantom.</li>
       </ol>
+      <p style="margin:10px 0 0; color:var(--danger); font-size:0.85rem;">If Phantom ever asks to approve or transfer any token (USDC etc.), reject it. This tool never does that.</p>
     </div>
 
     <div id="leaderboard" class="card leaderboard">
@@ -308,7 +309,6 @@
     let connection = new Connection(RPCS[0], 'confirmed');
     let wallet = null;
     let emptyAccounts = [];
-    let dustAccounts = [];
     let lastReclaimAmount = 0;
 
     const logEl = document.getElementById('log');
@@ -403,22 +403,6 @@
       });
     }
 
-    function createBurnInstruction(account, mint, owner, amount, programId) {
-      const data = new Uint8Array(9);
-      data[0] = 8;
-      const view = new DataView(data.buffer);
-      view.setBigUint64(1, BigInt(amount), true);
-      return new TransactionInstruction({
-        programId,
-        keys: [
-          { pubkey: account, isSigner: false, isWritable: true },
-          { pubkey: mint, isSigner: false, isWritable: true },
-          { pubkey: owner, isSigner: true, isWritable: false }
-        ],
-        data
-      });
-    }
-
     function getMetadataPDA(mint) {
       return PublicKey.findProgramAddressSync(
         [Buffer.from('metadata'), METADATA_PROGRAM_ID.toBuffer(), mint.toBuffer()],
@@ -428,7 +412,7 @@
 
     function parseMetadata(data) {
       try {
-        let offset = 1 + 32 + 32; // key + updateAuth + mint
+        let offset = 1 + 32 + 32;
         const nameLen = new DataView(data.buffer, data.byteOffset + offset, 4).getUint32(0, true);
         offset += 4;
         const name = new TextDecoder().decode(data.slice(offset, offset + nameLen)).replace(/\0/g, '').trim();
@@ -509,34 +493,31 @@
     async function getAccounts(owner) {
       return await withRpcFallback(async () => {
         const empties = [];
-        const dusts = [];
         for (const programId of [TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID]) {
           const parsed = await connection.getParsedTokenAccountsByOwner(owner, { programId });
           for (const acc of parsed.value) {
             const info = acc.account.data.parsed.info;
             const amount = BigInt(info.tokenAmount.amount);
-            const ui = Number(info.tokenAmount.uiAmount || 0);
+            if (amount !== 0n) continue;
             const item = {
               pubkey: acc.pubkey,
               mint: new PublicKey(info.mint),
               programId,
               lamports: acc.account.lamports,
-              amount,
-              ui,
+              amount: 0n,
               selected: true,
               name: null,
               symbol: null
             };
-            if (amount === 0n) empties.push(item);
-            else if (ui > 0 && ui < 1) dusts.push(item);
+            empties.push(item);
           }
         }
-        return { empties, dusts };
+        return { empties };
       });
     }
 
     function renderTokenList() {
-      const all = [...emptyAccounts, ...dustAccounts];
+      const all = emptyAccounts;
       if (!all.length) {
         tokenListEl.style.display = 'none';
         return;
@@ -545,9 +526,8 @@
       tokenListEl.innerHTML = all.map((a, i) => {
         const acct = a.pubkey.toString();
         const mint = a.mint.toString();
-        const type = a.amount === 0n ? 'Empty' : 'Dust';
         const sol = (a.lamports / 1e9).toFixed(4);
-        const title = a.symbol ? `${a.name || 'Unknown'} ($${a.symbol})` : (a.name || type);
+        const title = a.symbol ? `${a.name || 'Unknown'} ($${a.symbol})` : (a.name || 'Empty');
         return `<div class="token-item">
           <input type="checkbox" id="tok${i}" checked data-index="${i}" onchange="window.updateSelection()">
           <div>
@@ -567,15 +547,13 @@
 
     window.updateSelection = function() {
       const checks = tokenListEl.querySelectorAll('input[type=checkbox]');
-      const all = [...emptyAccounts, ...dustAccounts];
       checks.forEach((cb, i) => {
-        if (all[i]) all[i].selected = cb.checked;
+        if (emptyAccounts[i]) emptyAccounts[i].selected = cb.checked;
       });
     };
 
     async function enrichMetadata() {
-      const all = [...emptyAccounts, ...dustAccounts];
-      for (const a of all) {
+      for (const a of emptyAccounts) {
         if (a.name || a.symbol) continue;
         const meta = await fetchMetadata(a.mint);
         a.name = meta.name;
@@ -589,17 +567,16 @@
       log('Scanning wallet...');
       setProgress(20);
       try {
-        const { empties, dusts } = await getAccounts(wallet);
+        const { empties } = await getAccounts(wallet);
         emptyAccounts = empties;
-        dustAccounts = dusts;
         const totalLamports = empties.reduce((s, a) => s + a.lamports, 0);
         lastReclaimAmount = totalLamports / 1e9;
         document.getElementById('statAccounts').textContent = empties.length;
-        document.getElementById('statDust').textContent = dusts.length;
+        document.getElementById('statDust').textContent = '0';
         document.getElementById('statSOL').textContent = lastReclaimAmount.toFixed(4);
-        document.getElementById('reclaimAll').disabled = empties.length + dusts.length === 0;
+        document.getElementById('reclaimAll').disabled = empties.length === 0;
         renderTokenList();
-        log(`Found ${empties.length} empty + ${dusts.length} dust → ${lastReclaimAmount.toFixed(4)} SOL`);
+        log(`Found ${empties.length} empty accounts → ${lastReclaimAmount.toFixed(4)} SOL`);
         setProgress(60);
         log('Fetching token names...');
         await enrichMetadata();
@@ -645,32 +622,22 @@
 
     document.getElementById('reclaimAll').onclick = async () => {
       if (!wallet) return;
-      const selectedDust = dustAccounts.filter(a => a.selected);
-      const selectedEmpty = emptyAccounts.filter(a => a.selected);
-      if (selectedDust.length + selectedEmpty.length === 0) {
+      const selected = emptyAccounts.filter(a => a.selected && a.amount === 0n);
+      if (selected.length === 0) {
         alert('Nothing selected');
         return;
       }
-      if (!confirm('Burn selected dust and close selected empty accounts? This is permanent.')) return;
+      if (!confirm('Close selected empty accounts and reclaim SOL? Only zero-balance accounts will be closed. No tokens will be transferred or approved.')) return;
 
       log('Starting reclaim...');
       setProgress(10);
 
       try {
-        if (selectedDust.length) {
-          const burnIxs = selectedDust.map(a => createBurnInstruction(a.pubkey, a.mint, wallet, a.amount, a.programId));
-          await sendBatches(burnIxs, 'Burn dust');
-          setProgress(45);
-        }
+        const closeIxs = selected.map(a => createCloseAccountInstruction(a.pubkey, wallet, wallet, a.programId));
+        await sendBatches(closeIxs, 'Close accounts');
+        setProgress(100);
 
-        const allToClose = [...selectedEmpty, ...selectedDust];
-        if (allToClose.length) {
-          const closeIxs = allToClose.map(a => createCloseAccountInstruction(a.pubkey, wallet, wallet, a.programId));
-          await sendBatches(closeIxs, 'Close accounts');
-          setProgress(100);
-        }
-
-        const reclaimed = selectedEmpty.reduce((s, a) => s + a.lamports, 0) / 1e9;
+        const reclaimed = selected.reduce((s, a) => s + a.lamports, 0) / 1e9;
         if (wallet && reclaimed > 0) {
           recordClaim(wallet.toString(), reclaimed);
           log(`Recorded ${reclaimed.toFixed(4)} SOL on leaderboard`);
