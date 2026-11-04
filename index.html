@@ -3,59 +3,164 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>VexInclinator — Zero Fee Solana Cleaner</title>
+  <title>VexInclinator — Reclaim Locked SOL (0% Fee)</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔥</text></svg>">
   <script src="https://unpkg.com/@solana/web3.js@1.95.3/lib/index.iife.min.js"></script>
   <style>
     :root {
-      --bg: #07070a;
-      --card: #111114;
-      --border: #222228;
-      --text: #e8e8ed;
-      --muted: #8a8a96;
+      --bg: #050508;
+      --card: rgba(18,18,22,0.85);
+      --border: #2a2a32;
+      --text: #f0f0f5;
+      --muted: #9a9aaa;
       --accent: #00ff9d;
       --accent-dark: #00cc7a;
-      --danger: #ff4d4d;
+      --danger: #ff5c5c;
+      --glow: 0 0 40px rgba(0,255,157,0.15);
     }
     * { box-sizing: border-box; }
-    body { margin: 0; font-family: system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; }
-    .container { max-width: 960px; margin: 0 auto; padding: 24px 16px; }
-    header { text-align: center; margin-bottom: 32px; }
-    h1 { font-size: 2.4rem; margin: 0; background: linear-gradient(90deg, var(--accent), #00d4ff); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-    .subtitle { color: var(--muted); margin-top: 8px; }
-    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin: 20px 0; }
-    .stat { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px; text-align: center; }
-    .stat-value { font-size: 1.6rem; font-weight: 700; color: var(--accent); }
-    .stat-label { font-size: 0.85rem; color: var(--muted); }
-    .card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 20px; margin-bottom: 20px; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      position: relative;
+      overflow-x: hidden;
+    }
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 80% 50% at 50% -20%, rgba(0,255,157,0.12), transparent),
+        radial-gradient(ellipse 60% 40% at 100% 100%, rgba(0,180,255,0.08), transparent);
+      pointer-events: none;
+      z-index: 0;
+      animation: pulse 12s ease-in-out infinite alternate;
+    }
+    @keyframes pulse {
+      0% { opacity: 0.6; }
+      100% { opacity: 1; }
+    }
+    .container { max-width: 980px; margin: 0 auto; padding: 28px 16px 60px; position: relative; z-index: 1; }
+    header { text-align: center; margin-bottom: 28px; }
+    h1 {
+      font-size: clamp(2rem, 5vw, 2.8rem);
+      margin: 0;
+      background: linear-gradient(90deg, var(--accent), #00d4ff);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      font-weight: 800;
+    }
+    .subtitle { color: var(--muted); margin: 8px 0 0; font-size: 1.05rem; }
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 14px;
+      margin: 24px 0;
+    }
+    .stat {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 20px;
+      text-align: center;
+      backdrop-filter: blur(10px);
+      box-shadow: var(--glow);
+    }
+    .stat-value { font-size: 2rem; font-weight: 800; color: var(--accent); }
+    .stat-label { font-size: 0.9rem; color: var(--muted); margin-top: 4px; }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 22px;
+      margin-bottom: 18px;
+      backdrop-filter: blur(12px);
+    }
     button {
-      background: var(--accent); color: #000; border: none; padding: 12px 22px; font-weight: 600;
-      border-radius: 8px; cursor: pointer; font-size: 0.95rem; transition: all 0.15s;
+      background: var(--accent);
+      color: #000;
+      border: none;
+      padding: 12px 22px;
+      font-weight: 700;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 0.95rem;
+      transition: all 0.15s ease;
     }
     button:hover:not(:disabled) { background: var(--accent-dark); transform: translateY(-1px); }
-    button:disabled { opacity: 0.45; cursor: not-allowed; }
-    button.secondary { background: #222; color: var(--text); border: 1px solid var(--border); }
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
+    button.secondary {
+      background: #1c1c22;
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+    button.danger { background: var(--danger); color: #fff; }
     .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
     textarea {
-      background: #0d0d10; border: 1px solid var(--border); color: var(--text);
-      padding: 10px 12px; border-radius: 8px; width: 100%; font-family: inherit; min-height: 100px;
+      background: #0c0c10;
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 12px;
+      border-radius: 10px;
+      width: 100%;
+      font-family: inherit;
+      min-height: 110px;
+      resize: vertical;
     }
-    .log { background: #0a0a0c; border-radius: 8px; padding: 12px; font-family: monospace; font-size: 0.85rem; max-height: 220px; overflow-y: auto; color: #aaa; }
-    .badge { display: inline-block; background: #1a1a1e; padding: 4px 10px; border-radius: 999px; font-size: 0.75rem; color: var(--muted); }
-    .progress { height: 6px; background: #222; border-radius: 3px; margin: 10px 0; overflow: hidden; }
-    .progress-bar { height: 100%; background: var(--accent); width: 0%; transition: width 0.3s; }
-    footer { text-align: center; color: var(--muted); font-size: 0.85rem; margin-top: 40px; }
+    .log {
+      background: #08080b;
+      border-radius: 10px;
+      padding: 14px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 0.82rem;
+      max-height: 240px;
+      overflow-y: auto;
+      color: #b0b0c0;
+      border: 1px solid #1a1a20;
+    }
+    .badge {
+      display: inline-block;
+      background: #1a1a20;
+      padding: 5px 12px;
+      border-radius: 999px;
+      font-size: 0.78rem;
+      color: var(--muted);
+    }
+    .progress {
+      height: 8px;
+      background: #1a1a20;
+      border-radius: 4px;
+      margin: 12px 0;
+      overflow: hidden;
+    }
+    .progress-bar {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), #00d4ff);
+      width: 0%;
+      transition: width 0.35s ease;
+    }
+    .guide {
+      background: linear-gradient(180deg, rgba(0,255,157,0.04), transparent);
+      border: 1px solid #1f3a2e;
+    }
+    .guide ol { margin: 10px 0 0 20px; padding: 0; }
+    .guide li { margin: 6px 0; }
+    footer { text-align: center; color: var(--muted); font-size: 0.85rem; margin-top: 36px; }
     a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
   </style>
 </head>
 <body>
   <div class="container">
     <header>
       <h1>🔥 VexInclinator</h1>
-      <p class="subtitle">Zero-fee all-in-one Solana wallet cleaner · Reclaim 100% locked SOL</p>
+      <p class="subtitle">Reclaim locked SOL from empty token accounts · 0% fee · Non-custodial</p>
     </header>
 
-    <div class="stats" id="stats">
+    <div class="stats">
       <div class="stat"><div class="stat-value" id="statAccounts">—</div><div class="stat-label">Empty Accounts</div></div>
       <div class="stat"><div class="stat-value" id="statDust">—</div><div class="stat-label">Dust Tokens</div></div>
       <div class="stat"><div class="stat-value" id="statSOL">0.000</div><div class="stat-label">Reclaimable SOL</div></div>
@@ -64,26 +169,38 @@
     <div class="card">
       <div class="row">
         <button id="connect">Connect Phantom</button>
+        <button id="disconnect" class="secondary" style="display:none;">Disconnect</button>
         <span id="wallet" class="badge">Not connected</span>
         <button id="scan" class="secondary" disabled>Scan Wallet</button>
         <button id="reclaimAll" disabled>Reclaim All (0% fee)</button>
       </div>
       <div class="progress"><div class="progress-bar" id="progress"></div></div>
-      <div id="log" class="log" style="margin-top:12px;">Ready. Connect wallet to start.</div>
+      <div id="log" class="log" style="margin-top:14px;">Ready. Connect your wallet to start.</div>
+    </div>
+
+    <div class="card guide">
+      <h3 style="margin:0 0 10px;">How it works (for beginners)</h3>
+      <p style="margin:0 0 8px; color:var(--muted);">Every time you receive a token on Solana, a small account is created that locks ~0.002 SOL as rent. When the account is empty, that SOL is still locked until you close it.</p>
+      <ol>
+        <li><strong>Connect</strong> your Phantom wallet (we never see your keys).</li>
+        <li>Click <strong>Scan Wallet</strong> to find empty accounts and tiny dust balances.</li>
+        <li>Click <strong>Reclaim All</strong>. Confirm in Phantom. Your SOL returns to your wallet.</li>
+      </ol>
+      <p style="margin:10px 0 0; font-size:0.9rem; color:var(--muted);">Safe · You only approve the exact transactions · 0% fee forever.</p>
     </div>
 
     <div class="card">
       <h3 style="margin-top:0;">Multi-Wallet Scan <span class="badge">Read-only</span></h3>
+      <p style="margin:0 0 10px; color:var(--muted); font-size:0.9rem;">Paste any public addresses (one per line) to check reclaimable SOL without connecting.</p>
       <textarea id="addresses" placeholder="Paste public keys, one per line"></textarea>
       <div class="row" style="margin-top:10px;">
         <button id="scanMulti" class="secondary">Scan Addresses</button>
       </div>
-      <div id="multiResults" style="margin-top:12px;"></div>
+      <div id="multiResults" style="margin-top:14px;"></div>
     </div>
 
     <div class="card">
-      <p style="margin:0;"><strong>0% fee forever.</strong> Non-custodial · Your keys never leave Phantom · Open source</p>
-      <p style="margin:8px 0 0; color:var(--muted); font-size:0.9rem;">Supports classic Token Program + Token-2022. Closes empty accounts and burns dust.</p>
+      <p style="margin:0;"><strong>0% fee forever.</strong> Non-custodial · Open source · Supports Token Program + Token-2022</p>
     </div>
 
     <footer>
@@ -93,7 +210,7 @@
 
   <script>
     if (typeof solanaWeb3 === 'undefined') {
-      document.getElementById('log').innerHTML = '<div style="color:#ff4d4d">Error: Solana web3.js failed to load. Refresh the page.</div>';
+      document.getElementById('log').innerHTML = '<div style="color:#ff5c5c">Error: Solana web3.js failed to load. Refresh the page.</div>';
     }
 
     const { Connection, PublicKey, Transaction, TransactionInstruction } = solanaWeb3;
@@ -101,13 +218,23 @@
     const TOKEN_PROGRAM_ID = new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA');
     const TOKEN_2022_PROGRAM_ID = new PublicKey('TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb');
 
-    const connection = new Connection('https://api.mainnet-beta.solana.com', 'confirmed');
+    const RPCS = [
+      'https://solana-rpc.publicnode.com',
+      'https://api.mainnet-beta.solana.com',
+      'https://solana.api.onfinality.io/public',
+      'https://rpc.ankr.com/solana'
+    ];
+
+    let connection = new Connection(RPCS[0], 'confirmed');
     let wallet = null;
     let emptyAccounts = [];
     let dustAccounts = [];
 
     const logEl = document.getElementById('log');
     const progressEl = document.getElementById('progress');
+    const connectBtn = document.getElementById('connect');
+    const disconnectBtn = document.getElementById('disconnect');
+    const walletBadge = document.getElementById('wallet');
 
     function log(msg) {
       logEl.innerHTML += `<div>${new Date().toLocaleTimeString()} — ${msg}</div>`;
@@ -116,7 +243,18 @@
 
     function setProgress(pct) { progressEl.style.width = pct + '%'; }
 
-    // Manual instruction builders (no spl-token dependency)
+    async function withRpcFallback(fn) {
+      for (let i = 0; i < RPCS.length; i++) {
+        try {
+          connection = new Connection(RPCS[i], 'confirmed');
+          return await fn();
+        } catch (e) {
+          if (i === RPCS.length - 1) throw e;
+          log(`RPC ${RPCS[i].split('//')[1].split('/')[0]} failed, trying next...`);
+        }
+      }
+    }
+
     function createCloseAccountInstruction(account, destination, owner, programId) {
       return new TransactionInstruction({
         programId,
@@ -125,13 +263,13 @@
           { pubkey: destination, isSigner: false, isWritable: true },
           { pubkey: owner, isSigner: true, isWritable: false }
         ],
-        data: Buffer.from([9]) // CloseAccount discriminator
+        data: Buffer.from([9])
       });
     }
 
     function createBurnInstruction(account, mint, owner, amount, programId) {
       const data = Buffer.alloc(9);
-      data.writeUInt8(8, 0); // Burn discriminator
+      data.writeUInt8(8, 0);
       data.writeBigUInt64LE(BigInt(amount), 1);
       return new TransactionInstruction({
         programId,
@@ -144,49 +282,75 @@
       });
     }
 
-    document.getElementById('connect').onclick = async () => {
+    function setConnected(pub) {
+      wallet = pub;
+      walletBadge.textContent = pub.toString().slice(0, 4) + '...' + pub.toString().slice(-4);
+      connectBtn.style.display = 'none';
+      disconnectBtn.style.display = 'inline-block';
+      document.getElementById('scan').disabled = false;
+    }
+
+    function setDisconnected() {
+      wallet = null;
+      walletBadge.textContent = 'Not connected';
+      connectBtn.style.display = 'inline-block';
+      disconnectBtn.style.display = 'none';
+      document.getElementById('scan').disabled = true;
+      document.getElementById('reclaimAll').disabled = true;
+      document.getElementById('statAccounts').textContent = '—';
+      document.getElementById('statDust').textContent = '—';
+      document.getElementById('statSOL').textContent = '0.000';
+    }
+
+    connectBtn.onclick = async () => {
       if (!window.solana?.isPhantom) {
-        alert('Install Phantom wallet');
+        alert('Install Phantom wallet first');
         window.open('https://phantom.app/', '_blank');
         return;
       }
       try {
         const resp = await window.solana.connect();
-        wallet = resp.publicKey;
-        document.getElementById('wallet').textContent = wallet.toString().slice(0, 4) + '...' + wallet.toString().slice(-4);
-        document.getElementById('scan').disabled = false;
+        setConnected(resp.publicKey);
         log('Wallet connected');
-      } catch (e) { log('Connect failed: ' + e.message); }
+      } catch (e) { log('Connect failed: ' + (e.message || e)); }
+    };
+
+    disconnectBtn.onclick = async () => {
+      try { await window.solana.disconnect(); } catch {}
+      setDisconnected();
+      log('Wallet disconnected');
     };
 
     async function getAccounts(owner) {
-      const empties = [];
-      const dusts = [];
-      for (const programId of [TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID]) {
-        const parsed = await connection.getParsedTokenAccountsByOwner(owner, { programId });
-        for (const acc of parsed.value) {
-          const info = acc.account.data.parsed.info;
-          const amount = BigInt(info.tokenAmount.amount);
-          const ui = Number(info.tokenAmount.uiAmount || 0);
-          const item = {
-            pubkey: acc.pubkey,
-            mint: new PublicKey(info.mint),
-            programId,
-            lamports: acc.account.lamports,
-            amount,
-            ui
-          };
-          if (amount === 0n) empties.push(item);
-          else if (ui > 0 && ui < 1) dusts.push(item);
+      return await withRpcFallback(async () => {
+        const empties = [];
+        const dusts = [];
+        for (const programId of [TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID]) {
+          const parsed = await connection.getParsedTokenAccountsByOwner(owner, { programId });
+          for (const acc of parsed.value) {
+            const info = acc.account.data.parsed.info;
+            const amount = BigInt(info.tokenAmount.amount);
+            const ui = Number(info.tokenAmount.uiAmount || 0);
+            const item = {
+              pubkey: acc.pubkey,
+              mint: new PublicKey(info.mint),
+              programId,
+              lamports: acc.account.lamports,
+              amount,
+              ui
+            };
+            if (amount === 0n) empties.push(item);
+            else if (ui > 0 && ui < 1) dusts.push(item);
+          }
         }
-      }
-      return { empties, dusts };
+        return { empties, dusts };
+      });
     }
 
     document.getElementById('scan').onclick = async () => {
       if (!wallet) return;
       log('Scanning wallet...');
-      setProgress(10);
+      setProgress(15);
       try {
         const { empties, dusts } = await getAccounts(wallet);
         emptyAccounts = empties;
@@ -198,25 +362,29 @@
         document.getElementById('reclaimAll').disabled = empties.length + dusts.length === 0;
         log(`Found ${empties.length} empty + ${dusts.length} dust accounts`);
         setProgress(100);
-        setTimeout(() => setProgress(0), 800);
-      } catch (e) { log('Scan error: ' + e.message); }
+        setTimeout(() => setProgress(0), 900);
+      } catch (e) {
+        log('Scan error: ' + (e.message || e));
+        setProgress(0);
+      }
     };
 
     async function sendBatches(instructionsList, label) {
-      const BATCH = 6;
+      const BATCH = 5;
       for (let i = 0; i < instructionsList.length; i += BATCH) {
         const batch = instructionsList.slice(i, i + BATCH);
         const tx = new Transaction();
         batch.forEach(ix => tx.add(ix));
         tx.feePayer = wallet;
-        tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+        const { blockhash } = await connection.getLatestBlockhash('confirmed');
+        tx.recentBlockhash = blockhash;
         try {
           const signed = await window.solana.signTransaction(tx);
-          const sig = await connection.sendRawTransaction(signed.serialize());
+          const sig = await connection.sendRawTransaction(signed.serialize(), { skipPreflight: false });
           await connection.confirmTransaction(sig, 'confirmed');
-          log(`${label} batch ${Math.floor(i/BATCH)+1} confirmed: ${sig.slice(0,8)}...`);
+          log(`${label} batch ${Math.floor(i/BATCH)+1} confirmed`);
         } catch (e) {
-          log(`${label} batch failed: ${e.message}`);
+          log(`${label} batch failed: ${e.message || e}`);
           throw e;
         }
       }
@@ -224,47 +392,51 @@
 
     document.getElementById('reclaimAll').onclick = async () => {
       if (!wallet || (emptyAccounts.length + dustAccounts.length === 0)) return;
-      if (!confirm('This will burn dust tokens and close empty accounts. Permanent. Continue?')) return;
+      if (!confirm('This will burn dust tokens and close empty accounts. This is permanent. Continue?')) return;
 
       log('Starting reclaim...');
-      setProgress(5);
+      setProgress(10);
 
-      if (dustAccounts.length) {
-        const burnIxs = dustAccounts.map(a => createBurnInstruction(a.pubkey, a.mint, wallet, a.amount, a.programId));
-        try {
+      try {
+        if (dustAccounts.length) {
+          const burnIxs = dustAccounts.map(a => createBurnInstruction(a.pubkey, a.mint, wallet, a.amount, a.programId));
           await sendBatches(burnIxs, 'Burn dust');
-          setProgress(40);
-        } catch (e) { log('Dust burn stopped'); return; }
-      }
+          setProgress(45);
+        }
 
-      const allToClose = [...emptyAccounts, ...dustAccounts];
-      if (allToClose.length) {
-        const closeIxs = allToClose.map(a => createCloseAccountInstruction(a.pubkey, wallet, wallet, a.programId));
-        try {
+        const allToClose = [...emptyAccounts, ...dustAccounts];
+        if (allToClose.length) {
+          const closeIxs = allToClose.map(a => createCloseAccountInstruction(a.pubkey, wallet, wallet, a.programId));
           await sendBatches(closeIxs, 'Close accounts');
           setProgress(100);
-        } catch (e) { log('Close stopped'); return; }
-      }
+        }
 
-      log('All done. SOL reclaimed (0% fee).');
-      setTimeout(() => document.getElementById('scan').click(), 1000);
+        log('Done. SOL reclaimed (0% fee).');
+        setTimeout(() => document.getElementById('scan').click(), 1200);
+      } catch (e) {
+        log('Reclaim stopped');
+        setProgress(0);
+      }
     };
 
     document.getElementById('scanMulti').onclick = async () => {
       const text = document.getElementById('addresses').value;
       const lines = text.split(/\n+/).map(l => l.trim()).filter(Boolean);
       const out = document.getElementById('multiResults');
-      out.innerHTML = 'Scanning...';
-      let html = "<div style='font-family:monospace;font-size:0.9rem;'>";
+      if (!lines.length) { out.innerHTML = '<div style="color:var(--muted)">No addresses</div>'; return; }
+      out.innerHTML = '<div>Scanning...</div>';
+      let html = "<div style='font-family:monospace;font-size:0.88rem;line-height:1.6;'>";
       for (const line of lines) {
         try {
           const pk = new PublicKey(line);
           const { empties } = await getAccounts(pk);
           const total = empties.reduce((s, a) => s + a.lamports, 0);
           html += `<div>${line.slice(0,6)}...${line.slice(-4)} → ${empties.length} empty → ${(total/1e9).toFixed(4)} SOL</div>`;
-        } catch { html += `<div style='color:#ff4d4d'>${line} → invalid</div>`; }
+        } catch (e) {
+          html += `<div style='color:#ff5c5c'>${line.slice(0,20)}... → invalid or RPC error</div>`;
+        }
       }
-      out.innerHTML = html + '</div>' || 'No addresses';
+      out.innerHTML = html + '</div>';
     };
   </script>
 </body>
