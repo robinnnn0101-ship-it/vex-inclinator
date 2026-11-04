@@ -462,21 +462,32 @@
     };
 
     async function sendBatches(instructionsList, label) {
-      const BATCH = 5;
+      const BATCH = 3;
       for (let i = 0; i < instructionsList.length; i += BATCH) {
         const batch = instructionsList.slice(i, i + BATCH);
         const tx = new Transaction();
         batch.forEach(ix => tx.add(ix));
         tx.feePayer = wallet;
-        const { blockhash } = await connection.getLatestBlockhash('confirmed');
-        tx.recentBlockhash = blockhash;
+
         try {
-          const signed = await window.solana.signTransaction(tx);
-          const sig = await connection.sendRawTransaction(signed.serialize());
-          await connection.confirmTransaction(sig, 'confirmed');
-          log(`${label} batch ${Math.floor(i/BATCH)+1} confirmed`);
+          const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed');
+          tx.recentBlockhash = blockhash;
+          tx.lastValidBlockHeight = lastValidBlockHeight;
+
+          let sig;
+          if (window.solana.signAndSendTransaction) {
+            const result = await window.solana.signAndSendTransaction(tx);
+            sig = result.signature || result;
+            log(`${label} batch ${Math.floor(i/BATCH)+1} sent via Phantom`);
+          } else {
+            const signed = await window.solana.signTransaction(tx);
+            sig = await connection.sendRawTransaction(signed.serialize(), { skipPreflight: false });
+            await connection.confirmTransaction({ signature: sig, blockhash, lastValidBlockHeight }, 'confirmed');
+            log(`${label} batch ${Math.floor(i/BATCH)+1} confirmed`);
+          }
         } catch (e) {
-          log(`${label} batch failed: ${e.message || e}`);
+          const msg = e.message || String(e);
+          log(`${label} batch failed: ${msg}`);
           throw e;
         }
       }
@@ -511,7 +522,7 @@
         log('Done. SOL reclaimed (0% fee).');
         setTimeout(() => document.getElementById('scan').click(), 1500);
       } catch (e) {
-        log('Reclaim stopped');
+        log('Reclaim stopped: ' + (e.message || String(e)));
         setProgress(0);
       }
     };
