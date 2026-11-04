@@ -119,6 +119,9 @@
       transition: width 0.35s ease;
     }
     .guide { border-color: #1f3a2e; }
+    .leaderboard { border-color: #2a2a1f; }
+    .lb-item { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #1a1a20; font-size: 0.9rem; }
+    .lb-rank { color: var(--accent); font-weight: 700; width: 30px; }
     footer { text-align: center; color: var(--muted); font-size: 0.85rem; margin-top: 36px; }
     a { color: var(--accent); text-decoration: none; }
   </style>
@@ -158,6 +161,13 @@
       </ol>
     </div>
 
+    <div class="card leaderboard">
+      <h3 style="margin:0 0 6px;">Claim Leaderboard</h3>
+      <p style="margin:0 0 12px; color:var(--accent); font-size:0.9rem; font-weight:600;">This ranking system will be impacted soon — maybe an airdrop or gift.</p>
+      <div id="leaderboardList" style="font-family:monospace;"></div>
+      <p style="margin:12px 0 0; color:var(--muted); font-size:0.8rem;">Records stored locally in your browser for now. Global ranking coming.</p>
+    </div>
+
     <div class="card">
       <h3 style="margin-top:0;">Multi-Wallet Scan <span class="badge">Read-only</span></h3>
       <textarea id="addresses" placeholder="Paste public keys, one per line"></textarea>
@@ -195,12 +205,14 @@
     let wallet = null;
     let emptyAccounts = [];
     let dustAccounts = [];
+    let lastReclaimAmount = 0;
 
     const logEl = document.getElementById('log');
     const progressEl = document.getElementById('progress');
     const connectBtn = document.getElementById('connect');
     const disconnectBtn = document.getElementById('disconnect');
     const walletBadge = document.getElementById('wallet');
+    const lbList = document.getElementById('leaderboardList');
 
     function log(msg) {
       logEl.innerHTML += `<div>${new Date().toLocaleTimeString()} — ${msg}</div>`;
@@ -208,6 +220,50 @@
     }
 
     function setProgress(pct) { progressEl.style.width = pct + '%'; }
+
+    function loadLeaderboard() {
+      try {
+        return JSON.parse(localStorage.getItem('vex_lb') || '{}');
+      } catch { return {}; }
+    }
+
+    function saveLeaderboard(data) {
+      localStorage.setItem('vex_lb', JSON.stringify(data));
+    }
+
+    function renderLeaderboard() {
+      const data = loadLeaderboard();
+      const entries = Object.entries(data)
+        .map(([addr, info]) => ({ addr, sol: info.sol || 0, claims: info.claims || 0 }))
+        .sort((a, b) => b.sol - a.sol)
+        .slice(0, 10);
+
+      if (!entries.length) {
+        lbList.innerHTML = '<div style="color:var(--muted);padding:8px 0;">No claims yet. Be the first.</div>';
+        return;
+      }
+
+      lbList.innerHTML = entries.map((e, i) =>
+        `<div class="lb-item">
+          <span class="lb-rank">#${i+1}</span>
+          <span>${e.addr.slice(0,4)}...${e.addr.slice(-4)}</span>
+          <span>${e.sol.toFixed(4)} SOL</span>
+          <span style="color:var(--muted);">${e.claims}x</span>
+        </div>`
+      ).join('');
+    }
+
+    function recordClaim(addr, solAmount) {
+      if (!addr || solAmount <= 0) return;
+      const data = loadLeaderboard();
+      if (!data[addr]) data[addr] = { sol: 0, claims: 0 };
+      data[addr].sol += solAmount;
+      data[addr].claims += 1;
+      saveLeaderboard(data);
+      renderLeaderboard();
+    }
+
+    renderLeaderboard();
 
     async function withRpcFallback(fn) {
       for (let i = 0; i < RPCS.length; i++) {
@@ -268,7 +324,6 @@
       document.getElementById('statSOL').textContent = '0.000';
     }
 
-    // Proper Phantom state
     if (window.solana?.isPhantom) {
       window.solana.on('connect', (pub) => {
         setConnected(pub);
@@ -335,11 +390,12 @@
         emptyAccounts = empties;
         dustAccounts = dusts;
         const totalLamports = empties.reduce((s, a) => s + a.lamports, 0);
+        lastReclaimAmount = totalLamports / 1e9;
         document.getElementById('statAccounts').textContent = empties.length;
         document.getElementById('statDust').textContent = dusts.length;
-        document.getElementById('statSOL').textContent = (totalLamports / 1e9).toFixed(4);
+        document.getElementById('statSOL').textContent = lastReclaimAmount.toFixed(4);
         document.getElementById('reclaimAll').disabled = empties.length + dusts.length === 0;
-        log(`Found ${empties.length} empty + ${dusts.length} dust → ${(totalLamports / 1e9).toFixed(4)} SOL`);
+        log(`Found ${empties.length} empty + ${dusts.length} dust → ${lastReclaimAmount.toFixed(4)} SOL`);
         setProgress(100);
         setTimeout(() => setProgress(0), 800);
       } catch (e) {
@@ -388,6 +444,11 @@
           const closeIxs = allToClose.map(a => createCloseAccountInstruction(a.pubkey, wallet, wallet, a.programId));
           await sendBatches(closeIxs, 'Close accounts');
           setProgress(100);
+        }
+
+        if (wallet && lastReclaimAmount > 0) {
+          recordClaim(wallet.toString(), lastReclaimAmount);
+          log(`Recorded ${lastReclaimAmount.toFixed(4)} SOL on leaderboard`);
         }
 
         log('Done. SOL reclaimed (0% fee).');
