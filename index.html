@@ -47,10 +47,23 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 28px;
-      padding-bottom: 16px;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
       border-bottom: 1px solid #1a1a20;
     }
+    .nav {
+      display: flex;
+      gap: 16px;
+      font-size: 0.9rem;
+      margin-bottom: 24px;
+    }
+    .nav a {
+      color: var(--muted);
+      text-decoration: none;
+      padding: 4px 0;
+      border-bottom: 2px solid transparent;
+    }
+    .nav a:hover { color: var(--accent); border-bottom-color: var(--accent); }
     .brand {
       display: flex;
       align-items: center;
@@ -169,19 +182,30 @@
       transition: width 0.35s ease;
     }
     .token-list {
-      max-height: 220px;
+      max-height: 260px;
       overflow-y: auto;
       margin: 10px 0;
-      font-size: 0.85rem;
+      font-size: 0.84rem;
     }
     .token-item {
       display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 6px 0;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 8px 0;
       border-bottom: 1px solid #1a1a20;
     }
-    .token-item input { accent-color: var(--accent); }
+    .token-item input { accent-color: var(--accent); margin-top: 3px; }
+    .copy-btn {
+      background: #1c1c22;
+      color: var(--muted);
+      border: 1px solid var(--border);
+      padding: 2px 6px;
+      font-size: 0.7rem;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-left: 4px;
+    }
+    .copy-btn:hover { color: var(--accent); }
     .guide { border-color: #1f3a2e; }
     .leaderboard { border-color: #2a2a1f; }
     .lb-item { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #1a1a20; font-size: 0.9rem; }
@@ -207,6 +231,12 @@
       </div>
     </div>
 
+    <nav class="nav">
+      <a href="#how">How it works</a>
+      <a href="#leaderboard">Leaderboard</a>
+      <a href="#multi">Multi-Wallet</a>
+    </nav>
+
     <div class="stats">
       <div class="stat"><div class="stat-value" id="statAccounts">—</div><div class="stat-label">Empty Accounts</div></div>
       <div class="stat"><div class="stat-value" id="statDust">—</div><div class="stat-label">Dust Tokens</div></div>
@@ -223,24 +253,25 @@
       <div id="log" class="log" style="margin-top:14px;">Ready. Connect your wallet to start.</div>
     </div>
 
-    <div class="card guide">
+    <div id="how" class="card guide">
       <h3 style="margin:0 0 10px;">How it works</h3>
-      <p style="margin:0 0 8px; color:var(--muted);">Every token account locks ~0.002 SOL as rent. When empty, close it to get the SOL back.</p>
+      <p style="margin:0 0 8px; color:var(--muted);">Every time you buy or swap a token on Solana, a tiny account is created that locks about <strong>0.002 SOL</strong> as rent. If you trade even 2–3 tokens a day or week, those leftover accounts stay on-chain and the SOL stays locked forever — until you close them.</p>
+      <p style="margin:0 0 10px; color:var(--muted);">This tool finds those empty accounts (and tiny dust), lets you choose which ones to close, and sends the locked SOL straight back to your wallet. Zero fee. Keys never leave your browser.</p>
       <ol style="margin:10px 0 0 20px; padding:0;">
-        <li><strong>Connect</strong> Phantom (keys never leave your browser).</li>
-        <li>Scan runs automatically and shows reclaimable SOL.</li>
-        <li>Uncheck any tokens you want to keep, then click <strong>Reclaim Selected</strong>.</li>
+        <li><strong>Connect</strong> Phantom.</li>
+        <li>Scan shows everything that can be reclaimed.</li>
+        <li>Uncheck anything you want to keep, then click <strong>Reclaim Selected</strong> and confirm in Phantom.</li>
       </ol>
     </div>
 
-    <div class="card leaderboard">
+    <div id="leaderboard" class="card leaderboard">
       <h3 style="margin:0 0 6px;">Claim Leaderboard</h3>
       <p style="margin:0 0 12px; color:var(--accent); font-size:0.9rem; font-weight:600;">This ranking system will be impacted soon — maybe an airdrop or gift.</p>
       <div id="leaderboardList" style="font-family:monospace;"></div>
       <p style="margin:12px 0 0; color:var(--muted); font-size:0.8rem;">Records stored locally in your browser for now. Global ranking coming.</p>
     </div>
 
-    <div class="card">
+    <div id="multi" class="card">
       <h3 style="margin-top:0;">Multi-Wallet Scan <span class="badge">Read-only</span></h3>
       <textarea id="addresses" placeholder="Paste public keys, one per line"></textarea>
       <div class="row" style="margin-top:10px;">
@@ -293,6 +324,15 @@
     }
 
     function setProgress(pct) { progressEl.style.width = pct + '%'; }
+
+    function copyText(text) {
+      navigator.clipboard.writeText(text).then(() => {
+        log('Copied: ' + text.slice(0, 8) + '...');
+      }).catch(() => {
+        log('Copy failed');
+      });
+    }
+    window.copyText = copyText;
 
     function loadLeaderboard() {
       try {
@@ -466,12 +506,23 @@
       }
       tokenListEl.style.display = 'block';
       tokenListEl.innerHTML = all.map((a, i) => {
-        const short = a.pubkey.toString().slice(0,4) + '...' + a.pubkey.toString().slice(-4);
+        const acct = a.pubkey.toString();
+        const mint = a.mint.toString();
         const type = a.amount === 0n ? 'Empty' : 'Dust';
         const sol = (a.lamports / 1e9).toFixed(4);
         return `<div class="token-item">
           <input type="checkbox" id="tok${i}" checked data-index="${i}" onchange="window.updateSelection()">
-          <label for="tok${i}">${short} · ${type} · ${sol} SOL</label>
+          <div>
+            <div><strong>${type}</strong> · ${sol} SOL</div>
+            <div style="color:var(--muted);font-size:0.78rem;margin-top:2px;">
+              Account: ${acct.slice(0,6)}...${acct.slice(-4)}
+              <button class="copy-btn" onclick="copyText('${acct}')">Copy</button>
+            </div>
+            <div style="color:var(--muted);font-size:0.78rem;">
+              Mint: ${mint.slice(0,6)}...${mint.slice(-4)}
+              <button class="copy-btn" onclick="copyText('${mint}')">Copy</button>
+            </div>
+          </div>
         </div>`;
       }).join('');
     }
