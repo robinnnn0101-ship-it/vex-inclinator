@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VexInclinator — Zero Fee Solana Cleaner</title>
+  <script src="https://unpkg.com/@solana/web3.js@1.95.3/lib/index.iife.min.js"></script>
+  <script src="https://unpkg.com/@solana/spl-token@0.4.8/lib/index.iife.min.js"></script>
+  <style>
+    body { font-family: system-ui, sans-serif; background: #0a0a0a; color: #eee; margin: 0; padding: 20px; }
+    .container { max-width: 800px; margin: 0 auto; }
+    h1 { color: #00ff9d; }
+    button { background: #00ff9d; color: #000; border: none; padding: 12px 24px; font-size: 16px; cursor: pointer; border-radius: 6px; margin: 5px; }
+    button:disabled { opacity: 0.5; }
+    .card { background: #111; padding: 20px; border-radius: 10px; margin: 15px 0; }
+    pre { background: #1a1a1a; padding: 10px; overflow: auto; border-radius: 5px; }
+    input { width: 100%; padding: 8px; margin: 5px 0; background: #222; color: #fff; border: 1px solid #333; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🔥 VexInclinator</h1>
+    <p>Zero-fee Solana wallet cleaner. Reclaim 100% locked SOL. Non-custodial.</p>
+
+    <div class="card">
+      <button id="connect">Connect Phantom</button>
+      <span id="wallet">Not connected</span>
+    </div>
+
+    <div class="card">
+      <button id="scan" disabled>Scan Wallet</button>
+      <div id="results"></div>
+    </div>
+
+    <div class="card">
+      <h3>Multi-wallet scan (read-only)</h3>
+      <textarea id="addresses" placeholder="Paste public keys, one per line" rows="4"></textarea>
+      <button id="scanMulti">Scan Addresses</button>
+      <div id="multiResults"></div>
+    </div>
+
+    <div class="card">
+      <p><strong>0% fee.</strong> You get every lamport back (minus tiny network fee).</p>
+      <p>Empty accounts only for close. Dust burn coming soon.</p>
+    </div>
+  </div>
+
+  <script>
+    const { Connection, PublicKey, Transaction, clusterApiUrl } = solanaWeb3;
+    const { TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID, createCloseAccountInstruction, getAccount } = splToken;
+
+    const connection = new Connection("https://api.mainnet-beta.solana.com", "confirmed");
+    let wallet = null;
+
+    document.getElementById("connect").onclick = async () => {
+      if (window.solana && window.solana.isPhantom) {
+        try {
+          const resp = await window.solana.connect();
+          wallet = resp.publicKey;
+          document.getElementById("wallet").textContent = wallet.toString().slice(0, 8) + "...";
+          document.getElementById("scan").disabled = false;
+        } catch (e) { alert("Connect failed: " + e.message); }
+      } else { alert("Install Phantom"); }
+    };
+
+    async function getEmptyAccounts(owner) {
+      const accounts = [];
+      for (const programId of [TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID]) {
+        const parsed = await connection.getParsedTokenAccountsByOwner(owner, { programId });
+        for (const acc of parsed.value) {
+          const info = acc.account.data.parsed.info;
+          if (info.tokenAmount.uiAmount === 0 || info.tokenAmount.amount === "0") {
+            accounts.push({
+              pubkey: acc.pubkey,
+              programId,
+              lamports: acc.account.lamports
+            });
+          }
+        }
+      }
+      return accounts;
+    }
+
+    document.getElementById("scan").onclick = async () => {
+      if (!wallet) return;
+      const results = document.getElementById("results");
+      results.innerHTML = "Scanning...";
+      try {
+        const empties = await getEmptyAccounts(wallet);
+        const total = empties.reduce((s, a) => s + a.lamports, 0);
+        results.innerHTML = `
+          <p>Found <b>${empties.length}</b> empty accounts</p>
+          <p>Reclaimable: <b>${(total / 1e9).toFixed(6)} SOL</b> (100%)</p>
+          <button id="reclaim">Reclaim All (0% fee)</button>
+        `;
+        document.getElementById("reclaim").onclick = () => reclaim(empties);
+      } catch (e) {
+        results.innerHTML = "Error: " + e.message;
+      }
+    };
+
+    async function reclaim(accounts) {
+      if (!accounts.length) return alert("Nothing to reclaim");
+      const BATCH = 8;
+      for (let i = 0; i < accounts.length; i += BATCH) {
+        const batch = accounts.slice(i, i + BATCH);
+        const tx = new Transaction();
+        for (const acc of batch) {
+          tx.add(createCloseAccountInstruction(
+            acc.pubkey,
+            wallet,
+            wallet,
+            [],
+            acc.programId
+          ));
+        }
+        tx.feePayer = wallet;
+        tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+        try {
+          const signed = await window.solana.signTransaction(tx);
+          const sig = await connection.sendRawTransaction(signed.serialize());
+          await connection.confirmTransaction(sig);
+          console.log("Batch done:", sig);
+        } catch (e) {
+          alert("Batch failed: " + e.message);
+          return;
+        }
+      }
+      alert("Done! All empty accounts closed. SOL reclaimed.");
+      document.getElementById("scan").click();
+    }
+
+    document.getElementById("scanMulti").onclick = async () => {
+      const text = document.getElementById("addresses").value;
+      const lines = text.split(/\n+/).map(l => l.trim()).filter(Boolean);
+      const out = document.getElementById("multiResults");
+      out.innerHTML = "Scanning...";
+      let html = "";
+      for (const line of lines) {
+        try {
+          const pk = new PublicKey(line);
+          const empties = await getEmptyAccounts(pk);
+          const total = empties.reduce((s, a) => s + a.lamports, 0);
+          html += `<p>${line.slice(0,8)}... → ${empties.length} empty → ${(total/1e9).toFixed(4)} SOL</p>`;
+        } catch (e) {
+          html += `<p>${line} → invalid</p>`;
+        }
+      }
+      out.innerHTML = html || "No valid addresses";
+    };
+  </script>
+</body>
+</html>
