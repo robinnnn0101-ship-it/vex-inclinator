@@ -469,20 +469,12 @@
 
     let walletProvider = null;
 
-    function getWalletProviders() {
-      const providers = [];
-      // Solflare browser usually injects window.solana as Solflare
-      if (window.solflare?.isSolflare || window.solana?.isSolflare) {
-        const solflare = window.solflare || window.solana;
-        providers.push({ name: 'Solflare', provider: solflare });
-      }
-      if (window.solana?.isPhantom) providers.push({ name: 'Phantom', provider: window.solana });
-      if (window.backpack) providers.push({ name: 'Backpack', provider: window.backpack });
-      if (window.glow) providers.push({ name: 'Glow', provider: window.glow });
-      if (window.solana && !window.solana.isPhantom && !window.solana.isSolflare) {
-        providers.push({ name: 'Solana', provider: window.solana });
-      }
-      return providers;
+    function getProvider() {
+      if (window.solana?.isPhantom) return { name: 'Phantom', provider: window.solana };
+      if (window.solflare) return { name: 'Solflare', provider: window.solflare };
+      if (window.solana?.isSolflare) return { name: 'Solflare', provider: window.solana };
+      if (window.solana) return { name: 'Solana', provider: window.solana };
+      return null;
     }
 
     function setConnected(pub, provider) {
@@ -510,21 +502,22 @@
     }
 
     connectBtn.onclick = async () => {
-      const providers = getWalletProviders();
-      if (!providers.length) {
-        alert('Install a Solana wallet (Phantom, Solflare, Backpack, etc.)');
+      const p = getProvider();
+      if (!p) {
+        alert('Install Phantom or Solflare wallet');
         window.open('https://phantom.app/', '_blank');
         return;
       }
-      const preferred = providers.find(p => p.name === 'Solflare') || providers.find(p => p.name === 'Phantom') || providers[0];
       try {
-        await preferred.provider.connect();
-        const pub = preferred.provider.publicKey;
-        if (!pub) throw new Error('No public key after connect');
-        setConnected(new PublicKey(pub.toString()), preferred.provider);
-        log(`Connected with ${preferred.name}`);
+        await p.provider.connect();
+        const pub = p.provider.publicKey;
+        if (!pub) throw new Error('No public key');
+        setConnected(new PublicKey(pub.toString()), p.provider);
+        log(`Connected with ${p.name}`);
         document.getElementById('scan').click();
-      } catch (e) { log('Connect failed: ' + (e.message || e)); }
+      } catch (e) {
+        log('Connect failed: ' + (e.message || e));
+      }
     };
 
     disconnectBtn.onclick = async () => {
@@ -642,21 +635,12 @@
           tx.recentBlockhash = blockhash;
           tx.lastValidBlockHeight = lastValidBlockHeight;
 
-          if (!walletProvider) throw new Error('Wallet provider missing');
+          if (!walletProvider) throw new Error('No wallet');
 
-          let sig;
-          if (typeof walletProvider.signAndSendTransaction === 'function') {
-            const result = await walletProvider.signAndSendTransaction(tx);
-            sig = result?.signature || result;
-            log(`${label} batch ${Math.floor(i/BATCH)+1} sent via wallet`);
-          } else if (typeof walletProvider.signTransaction === 'function') {
-            const signed = await walletProvider.signTransaction(tx);
-            sig = await connection.sendRawTransaction(signed.serialize(), { skipPreflight: false });
-            await connection.confirmTransaction({ signature: sig, blockhash, lastValidBlockHeight }, 'confirmed');
-            log(`${label} batch ${Math.floor(i/BATCH)+1} confirmed`);
-          } else {
-            throw new Error('Wallet does not support signing');
-          }
+          const signed = await walletProvider.signTransaction(tx);
+          const sig = await connection.sendRawTransaction(signed.serialize(), { skipPreflight: false });
+          await connection.confirmTransaction({ signature: sig, blockhash, lastValidBlockHeight }, 'confirmed');
+          log(`${label} batch ${Math.floor(i/BATCH)+1} confirmed`);
         } catch (e) {
           const msg = e.message || String(e);
           log(`${label} batch failed: ${msg}`);
