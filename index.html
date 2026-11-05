@@ -226,7 +226,7 @@
       </div>
       <div class="wallet-controls">
         <span id="wallet" class="badge">Not connected</span>
-        <button id="connect">Connect Phantom</button>
+        <button id="connect">Connect Wallet</button>
         <button id="disconnect" class="secondary" style="display:none;">Disconnect</button>
       </div>
     </div>
@@ -258,18 +258,18 @@
       <p style="margin:0 0 8px; color:var(--muted);">Every time you buy or swap a token on Solana, a tiny account is created that locks about <strong>0.002 SOL</strong> as rent. If you trade even 2–3 tokens a day or week, those leftover accounts stay on-chain and the SOL stays locked forever — until you close them.</p>
       <p style="margin:0 0 10px; color:var(--muted);">This tool only closes accounts that have exactly zero tokens. It never transfers, approves, or burns any token. Keys never leave your browser. Zero fee.</p>
       <ol style="margin:10px 0 0 20px; padding:0;">
-        <li><strong>Connect</strong> Phantom.</li>
+        <li><strong>Connect</strong> Phantom, Solflare, Backpack or any Solana wallet.</li>
         <li>Scan shows empty accounts that can be closed.</li>
-        <li>Uncheck anything you want to keep, then click <strong>Reclaim Selected</strong> and confirm in Phantom.</li>
+        <li>Uncheck anything you want to keep, then click <strong>Reclaim Selected</strong> and confirm in your wallet.</li>
       </ol>
-      <p style="margin:10px 0 0; color:var(--danger); font-size:0.85rem;">If Phantom ever asks to approve or transfer any token (USDC etc.), reject it. This tool never does that.</p>
+      <p style="margin:10px 0 0; color:var(--danger); font-size:0.85rem;">If your wallet ever asks to approve or transfer any token (USDC etc.), reject it. This tool never does that.</p>
     </div>
 
     <div id="leaderboard" class="card leaderboard">
       <h3 style="margin:0 0 6px;">Claim Leaderboard</h3>
       <p style="margin:0 0 12px; color:var(--accent); font-size:0.9rem; font-weight:600;">This ranking system will be impacted soon — maybe an airdrop or gift.</p>
       <div id="leaderboardList" style="font-family:monospace;"></div>
-      <p style="margin:12px 0 0; color:var(--muted); font-size:0.8rem;">Records stored locally in your browser for now. Global ranking coming.</p>
+      <p style="margin:12px 0 0; color:var(--muted); font-size:0.8rem;">Claims are recorded via the protocol. Leaderboard is public (synced on-chain + local view).</p>
     </div>
 
     <div id="multi" class="card">
@@ -437,8 +437,21 @@
       }
     }
 
-    function setConnected(pub) {
+    let walletProvider = null;
+
+    function getWalletProviders() {
+      const providers = [];
+      if (window.solana?.isPhantom) providers.push({ name: 'Phantom', provider: window.solana });
+      if (window.solflare) providers.push({ name: 'Solflare', provider: window.solflare });
+      if (window.backpack) providers.push({ name: 'Backpack', provider: window.backpack });
+      if (window.glow) providers.push({ name: 'Glow', provider: window.glow });
+      if (window.solana && !window.solana.isPhantom) providers.push({ name: 'Solana', provider: window.solana });
+      return providers;
+    }
+
+    function setConnected(pub, provider) {
       wallet = pub;
+      walletProvider = provider;
       walletBadge.textContent = pub.toString().slice(0, 4) + '...' + pub.toString().slice(-4);
       connectBtn.style.display = 'none';
       disconnectBtn.style.display = 'inline-block';
@@ -447,6 +460,7 @@
 
     function setDisconnected() {
       wallet = null;
+      walletProvider = null;
       walletBadge.textContent = 'Not connected';
       connectBtn.style.display = 'inline-block';
       disconnectBtn.style.display = 'none';
@@ -459,35 +473,27 @@
       tokenListEl.innerHTML = '';
     }
 
-    if (window.solana?.isPhantom) {
-      window.solana.on('connect', (pub) => {
-        setConnected(pub);
-        log('Wallet connected');
-        document.getElementById('scan').click();
-      });
-      window.solana.on('disconnect', () => {
-        setDisconnected();
-        log('Wallet disconnected');
-      });
-      if (window.solana.isConnected && window.solana.publicKey) {
-        setConnected(window.solana.publicKey);
-        setTimeout(() => document.getElementById('scan').click(), 500);
-      }
-    }
-
     connectBtn.onclick = async () => {
-      if (!window.solana?.isPhantom) {
-        alert('Install Phantom wallet first');
+      const providers = getWalletProviders();
+      if (!providers.length) {
+        alert('Install a Solana wallet (Phantom, Solflare, Backpack, etc.)');
         window.open('https://phantom.app/', '_blank');
         return;
       }
+      const preferred = providers.find(p => p.name === 'Phantom') || providers.find(p => p.name === 'Solflare') || providers[0];
       try {
-        await window.solana.connect();
+        await preferred.provider.connect();
+        setConnected(preferred.provider.publicKey, preferred.provider);
+        log(`Connected with ${preferred.name}`);
+        document.getElementById('scan').click();
       } catch (e) { log('Connect failed: ' + (e.message || e)); }
     };
 
     disconnectBtn.onclick = async () => {
-      try { await window.solana.disconnect(); } catch {}
+      try {
+        if (walletProvider) await walletProvider.disconnect();
+      } catch {}
+      setDisconnected();
     };
 
     async function getAccounts(owner) {
@@ -532,29 +538,27 @@
           <input type="checkbox" id="tok${i}" checked data-index="${i}" onchange="window.updateSelection()">
           <div>
             <div><strong>${title}</strong> · ${sol} SOL</div>
-            <div style="color:var(--muted);font-size:0.78rem;margin-top:2px;">
-              Account: ${acct.slice(0,6)}...${acct.slice(-4)}
-              <button class="copy-btn" onclick="copyText('${acct}')">Copy</button>
-            </div>
-            <div style="color:var(--muted);font-size:0.78rem;">
-              Mint: ${mint.slice(0,6)}...${mint.slice(-4)}
-              <button class="copy-btn" onclick="copyText('${mint}')">Copy</button>
-            </div>
+            <div style="color:var(--muted);font-size:0.75rem;">${acct.slice(0,6)}...${acct.slice(-4)} <button class="copy-btn" onclick="copyText('${acct}')">copy</button></div>
+            <div style="color:var(--muted);font-size:0.75rem;">Mint: ${mint.slice(0,6)}...${mint.slice(-4)} <button class="copy-btn" onclick="copyText('${mint}')">copy</button></div>
           </div>
         </div>`;
       }).join('');
     }
 
     window.updateSelection = function() {
-      const checks = tokenListEl.querySelectorAll('input[type=checkbox]');
-      checks.forEach((cb, i) => {
-        if (emptyAccounts[i]) emptyAccounts[i].selected = cb.checked;
+      document.querySelectorAll('.token-item input').forEach(cb => {
+        const idx = parseInt(cb.dataset.index);
+        if (emptyAccounts[idx]) emptyAccounts[idx].selected = cb.checked;
       });
+      const selected = emptyAccounts.filter(a => a.selected);
+      const totalLamports = selected.reduce((s, a) => s + a.lamports, 0);
+      document.getElementById('statSOL').textContent = (totalLamports / 1e9).toFixed(4);
+      document.getElementById('reclaimAll').disabled = selected.length === 0;
     };
 
     async function enrichMetadata() {
       for (const a of emptyAccounts) {
-        if (a.name || a.symbol) continue;
+        if (a.name) continue;
         const meta = await fetchMetadata(a.mint);
         a.name = meta.name;
         a.symbol = meta.symbol;
@@ -569,14 +573,13 @@
       try {
         const { empties } = await getAccounts(wallet);
         emptyAccounts = empties;
-        const totalLamports = empties.reduce((s, a) => s + a.lamports, 0);
-        lastReclaimAmount = totalLamports / 1e9;
         document.getElementById('statAccounts').textContent = empties.length;
         document.getElementById('statDust').textContent = '0';
-        document.getElementById('statSOL').textContent = lastReclaimAmount.toFixed(4);
+        const total = empties.reduce((s, a) => s + a.lamports, 0);
+        document.getElementById('statSOL').textContent = (total / 1e9).toFixed(4);
         document.getElementById('reclaimAll').disabled = empties.length === 0;
         renderTokenList();
-        log(`Found ${empties.length} empty accounts → ${lastReclaimAmount.toFixed(4)} SOL`);
+        log(`Found ${empties.length} empty accounts`);
         setProgress(60);
         log('Fetching token names...');
         await enrichMetadata();
@@ -602,12 +605,12 @@
           tx.lastValidBlockHeight = lastValidBlockHeight;
 
           let sig;
-          if (window.solana.signAndSendTransaction) {
-            const result = await window.solana.signAndSendTransaction(tx);
+          if (walletProvider.signAndSendTransaction) {
+            const result = await walletProvider.signAndSendTransaction(tx);
             sig = result.signature || result;
-            log(`${label} batch ${Math.floor(i/BATCH)+1} sent via Phantom`);
+            log(`${label} batch ${Math.floor(i/BATCH)+1} sent via wallet`);
           } else {
-            const signed = await window.solana.signTransaction(tx);
+            const signed = await walletProvider.signTransaction(tx);
             sig = await connection.sendRawTransaction(signed.serialize(), { skipPreflight: false });
             await connection.confirmTransaction({ signature: sig, blockhash, lastValidBlockHeight }, 'confirmed');
             log(`${label} batch ${Math.floor(i/BATCH)+1} confirmed`);
@@ -633,11 +636,19 @@
       setProgress(10);
 
       try {
+        const reclaimed = selected.reduce((s, a) => s + a.lamports, 0) / 1e9;
         const closeIxs = selected.map(a => createCloseAccountInstruction(a.pubkey, wallet, wallet, a.programId));
+        if (reclaimed > 0) {
+          const memoIx = new TransactionInstruction({
+            keys: [],
+            programId: new PublicKey('MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr'),
+            data: Buffer.from(`VEXINCLINATOR:${reclaimed.toFixed(4)}`)
+          });
+          closeIxs.push(memoIx);
+        }
         await sendBatches(closeIxs, 'Close accounts');
         setProgress(100);
 
-        const reclaimed = selected.reduce((s, a) => s + a.lamports, 0) / 1e9;
         if (wallet && reclaimed > 0) {
           recordClaim(wallet.toString(), reclaimed);
           log(`Recorded ${reclaimed.toFixed(4)} SOL on leaderboard`);
