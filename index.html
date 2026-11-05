@@ -441,11 +441,17 @@
 
     function getWalletProviders() {
       const providers = [];
+      // Solflare browser usually injects window.solana as Solflare
+      if (window.solflare?.isSolflare || window.solana?.isSolflare) {
+        const solflare = window.solflare || window.solana;
+        providers.push({ name: 'Solflare', provider: solflare });
+      }
       if (window.solana?.isPhantom) providers.push({ name: 'Phantom', provider: window.solana });
-      if (window.solflare) providers.push({ name: 'Solflare', provider: window.solflare });
       if (window.backpack) providers.push({ name: 'Backpack', provider: window.backpack });
       if (window.glow) providers.push({ name: 'Glow', provider: window.glow });
-      if (window.solana && !window.solana.isPhantom) providers.push({ name: 'Solana', provider: window.solana });
+      if (window.solana && !window.solana.isPhantom && !window.solana.isSolflare) {
+        providers.push({ name: 'Solana', provider: window.solana });
+      }
       return providers;
     }
 
@@ -480,10 +486,12 @@
         window.open('https://phantom.app/', '_blank');
         return;
       }
-      const preferred = providers.find(p => p.name === 'Phantom') || providers.find(p => p.name === 'Solflare') || providers[0];
+      const preferred = providers.find(p => p.name === 'Solflare') || providers.find(p => p.name === 'Phantom') || providers[0];
       try {
         await preferred.provider.connect();
-        setConnected(preferred.provider.publicKey, preferred.provider);
+        const pub = preferred.provider.publicKey;
+        if (!pub) throw new Error('No public key after connect');
+        setConnected(new PublicKey(pub.toString()), preferred.provider);
         log(`Connected with ${preferred.name}`);
         document.getElementById('scan').click();
       } catch (e) { log('Connect failed: ' + (e.message || e)); }
@@ -604,16 +612,20 @@
           tx.recentBlockhash = blockhash;
           tx.lastValidBlockHeight = lastValidBlockHeight;
 
+          if (!walletProvider) throw new Error('Wallet provider missing');
+
           let sig;
-          if (walletProvider.signAndSendTransaction) {
+          if (typeof walletProvider.signAndSendTransaction === 'function') {
             const result = await walletProvider.signAndSendTransaction(tx);
-            sig = result.signature || result;
+            sig = result?.signature || result;
             log(`${label} batch ${Math.floor(i/BATCH)+1} sent via wallet`);
-          } else {
+          } else if (typeof walletProvider.signTransaction === 'function') {
             const signed = await walletProvider.signTransaction(tx);
             sig = await connection.sendRawTransaction(signed.serialize(), { skipPreflight: false });
             await connection.confirmTransaction({ signature: sig, blockhash, lastValidBlockHeight }, 'confirmed');
             log(`${label} batch ${Math.floor(i/BATCH)+1} confirmed`);
+          } else {
+            throw new Error('Wallet does not support signing');
           }
         } catch (e) {
           const msg = e.message || String(e);
