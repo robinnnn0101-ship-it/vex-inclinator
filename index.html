@@ -226,7 +226,7 @@
       </div>
       <div class="wallet-controls">
         <span id="wallet" class="badge">Not connected</span>
-        <button id="connect">Connect Wallet</button>
+        <button id="connect">Connect Phantom</button>
         <button id="disconnect" class="secondary" style="display:none;">Disconnect</button>
       </div>
     </div>
@@ -258,19 +258,18 @@
       <p style="margin:0 0 8px; color:var(--muted);">Every time you buy or swap a token on Solana, a tiny account is created that locks about <strong>0.002 SOL</strong> as rent. If you trade even 2–3 tokens a day or week, those leftover accounts stay on-chain and the SOL stays locked forever — until you close them.</p>
       <p style="margin:0 0 10px; color:var(--muted);">This tool only closes accounts that have exactly zero tokens. It never transfers, approves, or burns any token. Keys never leave your browser. Zero fee.</p>
       <ol style="margin:10px 0 0 20px; padding:0;">
-        <li><strong>Connect</strong> Phantom, Solflare, Backpack or any Solana wallet.</li>
+        <li><strong>Connect</strong> Phantom.</li>
         <li>Scan shows empty accounts that can be closed.</li>
-        <li>Uncheck anything you want to keep, then click <strong>Reclaim Selected</strong> and confirm in your wallet.</li>
+        <li>Uncheck anything you want to keep, then click <strong>Reclaim Selected</strong> and confirm in Phantom.</li>
       </ol>
-      <p style="margin:10px 0 0; color:var(--danger); font-size:0.85rem;">If your wallet ever asks to approve or transfer any token (USDC etc.), reject it. This tool never does that.</p>
+      <p style="margin:10px 0 0; color:var(--danger); font-size:0.85rem;">If Phantom ever asks to approve or transfer any token (USDC etc.), reject it. This tool never does that.</p>
     </div>
 
     <div id="leaderboard" class="card leaderboard">
       <h3 style="margin:0 0 6px;">Claim Leaderboard</h3>
-      <p style="margin:0 0 6px; color:var(--accent); font-size:0.95rem; font-weight:700;">Total reclaimed via protocol: <span id="totalReclaimed">0.0000 SOL</span></p>
-      <p style="margin:0 0 12px; color:var(--accent); font-size:0.9rem; font-weight:600;">Public ranking — every claim is stored and ranked.</p>
+      <p style="margin:0 0 12px; color:var(--accent); font-size:0.9rem; font-weight:600;">This ranking system will be impacted soon — maybe an airdrop or gift.</p>
       <div id="leaderboardList" style="font-family:monospace;"></div>
-      <p style="margin:12px 0 0; color:var(--muted); font-size:0.8rem;">All claims are stored publicly. Ranked by total SOL reclaimed.</p>
+      <p style="margin:12px 0 0; color:var(--muted); font-size:0.8rem;">Records stored locally in your browser for now. Global ranking coming.</p>
     </div>
 
     <div id="multi" class="card">
@@ -336,50 +335,22 @@
     }
     window.copyText = copyText;
 
-    const LB_URL = 'https://j.jstash.app/MRyqkqEStlkRKW9owYFwnQ';
-    const LB_EDIT_TOKEN = 'js_edit_Ac-mHRKLUxZdfsJrW_W9Jx72oYO_XAinjz2eRjESQ7k';
-    const LB_API = 'https://api.jstash.app/v1/bins/MRyqkqEStlkRKW9owYFwnQ/content';
-
-    let publicLb = { claims: {}, totalSol: 0, totalClaims: 0 };
-
-    async function loadPublicLeaderboard() {
+    function loadLeaderboard() {
       try {
-        const res = await fetch(LB_URL);
-        if (res.ok) {
-          publicLb = await res.json();
-          if (!publicLb.claims) publicLb.claims = {};
-          if (typeof publicLb.totalSol !== 'number') publicLb.totalSol = 0;
-          if (typeof publicLb.totalClaims !== 'number') publicLb.totalClaims = 0;
-        }
-      } catch (e) {
-        log('Leaderboard fetch failed, using local');
-      }
-      renderLeaderboard();
+        return JSON.parse(localStorage.getItem('vex_lb') || '{}');
+      } catch { return {}; }
     }
 
-    async function savePublicLeaderboard() {
-      try {
-        await fetch(LB_API, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Edit-Token': LB_EDIT_TOKEN
-          },
-          body: JSON.stringify(publicLb)
-        });
-      } catch (e) {
-        log('Public save failed');
-      }
+    function saveLeaderboard(data) {
+      localStorage.setItem('vex_lb', JSON.stringify(data));
     }
 
     function renderLeaderboard() {
-      const entries = Object.entries(publicLb.claims || {})
+      const data = loadLeaderboard();
+      const entries = Object.entries(data)
         .map(([addr, info]) => ({ addr, sol: info.sol || 0, claims: info.claims || 0 }))
         .sort((a, b) => b.sol - a.sol)
         .slice(0, 10);
-
-      const totalEl = document.getElementById('totalReclaimed');
-      if (totalEl) totalEl.textContent = (publicLb.totalSol || 0).toFixed(4) + ' SOL';
 
       if (!entries.length) {
         lbList.innerHTML = '<div style="color:var(--muted);padding:8px 0;">No claims yet. Be the first.</div>';
@@ -396,18 +367,17 @@
       ).join('');
     }
 
-    async function recordClaim(addr, solAmount) {
+    function recordClaim(addr, solAmount) {
       if (!addr || solAmount <= 0) return;
-      if (!publicLb.claims[addr]) publicLb.claims[addr] = { sol: 0, claims: 0 };
-      publicLb.claims[addr].sol += solAmount;
-      publicLb.claims[addr].claims += 1;
-      publicLb.totalSol = (publicLb.totalSol || 0) + solAmount;
-      publicLb.totalClaims = (publicLb.totalClaims || 0) + 1;
+      const data = loadLeaderboard();
+      if (!data[addr]) data[addr] = { sol: 0, claims: 0 };
+      data[addr].sol += solAmount;
+      data[addr].claims += 1;
+      saveLeaderboard(data);
       renderLeaderboard();
-      await savePublicLeaderboard();
     }
 
-    loadPublicLeaderboard();
+    renderLeaderboard();
 
     async function withRpcFallback(fn) {
       for (let i = 0; i < RPCS.length; i++) {
@@ -467,19 +437,8 @@
       }
     }
 
-    let walletProvider = null;
-
-    function getProvider() {
-      if (window.solana?.isPhantom) return { name: 'Phantom', provider: window.solana };
-      if (window.solflare) return { name: 'Solflare', provider: window.solflare };
-      if (window.solana?.isSolflare) return { name: 'Solflare', provider: window.solana };
-      if (window.solana) return { name: 'Solana', provider: window.solana };
-      return null;
-    }
-
-    function setConnected(pub, provider) {
+    function setConnected(pub) {
       wallet = pub;
-      walletProvider = provider;
       walletBadge.textContent = pub.toString().slice(0, 4) + '...' + pub.toString().slice(-4);
       connectBtn.style.display = 'none';
       disconnectBtn.style.display = 'inline-block';
@@ -488,7 +447,6 @@
 
     function setDisconnected() {
       wallet = null;
-      walletProvider = null;
       walletBadge.textContent = 'Not connected';
       connectBtn.style.display = 'inline-block';
       disconnectBtn.style.display = 'none';
@@ -501,30 +459,35 @@
       tokenListEl.innerHTML = '';
     }
 
+    if (window.solana?.isPhantom) {
+      window.solana.on('connect', (pub) => {
+        setConnected(pub);
+        log('Wallet connected');
+        document.getElementById('scan').click();
+      });
+      window.solana.on('disconnect', () => {
+        setDisconnected();
+        log('Wallet disconnected');
+      });
+      if (window.solana.isConnected && window.solana.publicKey) {
+        setConnected(window.solana.publicKey);
+        setTimeout(() => document.getElementById('scan').click(), 500);
+      }
+    }
+
     connectBtn.onclick = async () => {
-      const p = getProvider();
-      if (!p) {
-        alert('Install Phantom or Solflare wallet');
+      if (!window.solana?.isPhantom) {
+        alert('Install Phantom wallet first');
         window.open('https://phantom.app/', '_blank');
         return;
       }
       try {
-        await p.provider.connect();
-        const pub = p.provider.publicKey;
-        if (!pub) throw new Error('No public key');
-        setConnected(new PublicKey(pub.toString()), p.provider);
-        log(`Connected with ${p.name}`);
-        document.getElementById('scan').click();
-      } catch (e) {
-        log('Connect failed: ' + (e.message || e));
-      }
+        await window.solana.connect();
+      } catch (e) { log('Connect failed: ' + (e.message || e)); }
     };
 
     disconnectBtn.onclick = async () => {
-      try {
-        if (walletProvider) await walletProvider.disconnect();
-      } catch {}
-      setDisconnected();
+      try { await window.solana.disconnect(); } catch {}
     };
 
     async function getAccounts(owner) {
@@ -635,9 +598,7 @@
           tx.recentBlockhash = blockhash;
           tx.lastValidBlockHeight = lastValidBlockHeight;
 
-          if (!walletProvider) throw new Error('No wallet');
-
-          const signed = await walletProvider.signTransaction(tx);
+          const signed = await window.solana.signTransaction(tx);
           const sig = await connection.sendRawTransaction(signed.serialize(), { skipPreflight: false });
           await connection.confirmTransaction({ signature: sig, blockhash, lastValidBlockHeight }, 'confirmed');
           log(`${label} batch ${Math.floor(i/BATCH)+1} confirmed`);
@@ -664,19 +625,11 @@
       try {
         const reclaimed = selected.reduce((s, a) => s + a.lamports, 0) / 1e9;
         const closeIxs = selected.map(a => createCloseAccountInstruction(a.pubkey, wallet, wallet, a.programId));
-        if (reclaimed > 0) {
-          const memoIx = new TransactionInstruction({
-            keys: [],
-            programId: new PublicKey('MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr'),
-            data: Buffer.from(`VEXINCLINATOR:${reclaimed.toFixed(4)}`)
-          });
-          closeIxs.push(memoIx);
-        }
         await sendBatches(closeIxs, 'Close accounts');
         setProgress(100);
 
         if (wallet && reclaimed > 0) {
-          await recordClaim(wallet.toString(), reclaimed);
+          recordClaim(wallet.toString(), reclaimed);
           log(`Recorded ${reclaimed.toFixed(4)} SOL on leaderboard`);
         }
 
