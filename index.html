@@ -608,32 +608,60 @@
       const provider = currentWallet?.provider;
       if (!provider) throw new Error('No wallet connected');
 
+      // Ensure feePayer is a PublicKey object
+      const feePayer = (wallet && typeof wallet === 'object' && wallet.toBase58) ? wallet : new PublicKey(wallet);
+
       for (let i = 0; i < instructionsList.length; i += BATCH) {
         const batch = instructionsList.slice(i, i + BATCH);
         const tx = new Transaction();
         batch.forEach(ix => tx.add(ix));
-        tx.feePayer = wallet;
+        tx.feePayer = feePayer;
 
         try {
           const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed');
           tx.recentBlockhash = blockhash;
           tx.lastValidBlockHeight = lastValidBlockHeight;
 
-          let sig;
+          let sig = null;
+          let methodUsed = '';
+
+          // 1. Prefer signAndSendTransaction (Solflare & Backpack work best with this)
           if (typeof provider.signAndSendTransaction === 'function') {
-            sig = await provider.signAndSendTransaction(tx);
-          } else if (typeof provider.signTransaction === 'function') {
+            methodUsed = 'signAndSendTransaction';
+            log(`Using ${methodUsed}...`);
+            const result = await provider.signAndSendTransaction(tx);
+            // Handle different return formats
+            sig = (typeof result === 'string') ? result : (result?.signature || result?.txid || String(result));
+          }
+          // 2. Fallback to signTransaction + sendRaw
+          else if (typeof provider.signTransaction === 'function') {
+            methodUsed = 'signTransaction';
+            log(`Using ${methodUsed}...`);
             const signed = await provider.signTransaction(tx);
-            sig = await connection.sendRawTransaction(signed.serialize(), { skipPreflight: false });
-          } else {
-            throw new Error('Wallet does not support signing');
+            const raw = signed.serialize({ requireAllSignatures: false, verifySignatures: false });
+            sig = await connection.sendRawTransaction(raw, { skipPreflight: false });
+          }
+          // 3. Last resort: signAllTransactions
+          else if (typeof provider.signAllTransactions === 'function') {
+            methodUsed = 'signAllTransactions';
+            log(`Using ${methodUsed}...`);
+            const signedList = await provider.signAllTransactions([tx]);
+            const signed = signedList[0];
+            const raw = signed.serialize({ requireAllSignatures: false, verifySignatures: false });
+            sig = await connection.sendRawTransaction(raw, { skipPreflight: false });
+          }
+          else {
+            throw new Error('Wallet does not support any signing method');
           }
 
+          if (!sig) throw new Error('No signature returned from wallet');
+
           await connection.confirmTransaction({ signature: sig, blockhash, lastValidBlockHeight }, 'confirmed');
-          log(`${label} batch ${Math.floor(i/BATCH)+1} confirmed`);
+          log(`${label} batch ${Math.floor(i/BATCH)+1} confirmed (${methodUsed})`);
         } catch (e) {
-          const msg = e.message || String(e);
+          const msg = e?.message || String(e);
           log(`${label} batch failed: ${msg}`);
+          console.error('Full error:', e);
           throw e;
         }
       }
