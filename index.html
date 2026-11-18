@@ -1,1 +1,694 @@
-PLACEHOLDER_UPDATE_NEEDED
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VexInclinator — Reclaim Locked SOL (0% Fee)</title>
+  <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KICA8ZGVmcz4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0idiIgeDE9IjAlIiB5MT0iMCUiIHgyPSIxMDAlIiB5Mj0iMTAwJSI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCUiIHN0eWxlPSJzdG9wLWNvbG9yOiMwMGZmOWQiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxMDAlIiBzdHlsZT0ic3RvcC1jb2xvcjojMDBjYzdhIi8+CiAgICA8L2xpbmVhckdyYWRpZW50PgogICAgPGxpbmVhckdyYWRpZW50IGlkPSJmaXJlIiB4MT0iMCUiIHkxPSIxMDAlIiB4Mj0iMCUiIHkyPSIwJSI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCUiIHN0eWxlPSJzdG9wLWNvbG9yOiNmZjQ1MDAiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSI1MCUiIHN0eWxlPSJzdG9wLWNvbG9yOiNmZjhjMDAiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxMDAlIiBzdHlsZT0ic3RvcC1jb2xvcjojZmZkNzAwIi8+CiAgICA8L2xpbmVhckdyYWRpZW50PgogIDwvZGVmcz4KICA8cGF0aCBkPSJNMjAgODAgTDUwIDIwIEw4MCA4MCBMNjUgODAgTDUwIDQ1IEwzNSA4MCBaIiBmaWxsPSJ1cmwoI3YpIiBzdHJva2U9IiMwMGZmOWQiIHN0cm9rZS13aWR0aD0iMiIvPgogIDxwYXRoIGQ9Ik00MCA3NSBRNTAgNTAgNjAgNzUgUTUwIDkwIDQwIDc1IiBmaWxsPSJ1cmwoI2ZpcmUpIi8+CiAgPHRleHQgeD0iNTAiIHk9Ijk1IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LXNpemU9IjgiIGZpbGw9IiMwMGZmOWQiIGZvbnQtZmFtaWx5PSJzYW5zLXNlcmlmIj5WRVg8L3RleHQ+Cjwvc3ZnPgo=">
+  <script src="https://unpkg.com/@solana/web3.js@1.95.3/lib/index.iife.min.js"></script>
+  <style>
+    :root {
+      --bg: #050508;
+      --card: rgba(18,18,22,0.92);
+      --border: #2a2a32;
+      --text: #f0f0f5;
+      --muted: #9a9aaa;
+      --accent: #00ff9d;
+      --accent-dark: #00cc7a;
+      --danger: #ff5c5c;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      position: relative;
+      overflow-x: hidden;
+    }
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 70% 50% at 20% -10%, rgba(0,255,157,0.08), transparent),
+        radial-gradient(ellipse 50% 40% at 100% 100%, rgba(0,180,255,0.06), transparent);
+      pointer-events: none;
+      animation: glow 10s ease-in-out infinite alternate;
+      z-index: 0;
+    }
+    @keyframes glow {
+      0% { opacity: 0.5; }
+      100% { opacity: 1; }
+    }
+    .container { max-width: 980px; margin: 0 auto; padding: 20px 16px 60px; position: relative; z-index: 1; }
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #1a1a20;
+    }
+    .nav {
+      display: flex;
+      gap: 16px;
+      font-size: 0.9rem;
+      margin-bottom: 24px;
+    }
+    .nav a {
+      color: var(--muted);
+      text-decoration: none;
+      padding: 4px 0;
+      border-bottom: 2px solid transparent;
+    }
+    .nav a:hover { color: var(--accent); border-bottom-color: var(--accent); }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .logo {
+      width: 52px;
+      height: 52px;
+      border-radius: 14px;
+      object-fit: cover;
+      box-shadow: 0 0 24px rgba(0,255,157,0.45), 0 0 8px rgba(255,80,0,0.3);
+      animation: float 4s ease-in-out infinite;
+    }
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-4px); }
+    }
+    .brand-text h1 {
+      font-size: 1.6rem;
+      margin: 0;
+      background: linear-gradient(90deg, var(--accent), #00d4ff);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      font-weight: 800;
+    }
+    .brand-text .sub { font-size: 0.75rem; color: var(--muted); margin: 0; }
+    .wallet-controls { display: flex; gap: 8px; align-items: center; }
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 14px;
+      margin: 24px 0;
+    }
+    .stat {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 20px;
+      text-align: center;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .stat:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(0,255,157,0.1); }
+    .stat-value { font-size: 2rem; font-weight: 800; color: var(--accent); }
+    .stat-label { font-size: 0.9rem; color: var(--muted); margin-top: 4px; }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 22px;
+      margin-bottom: 18px;
+      backdrop-filter: blur(8px);
+    }
+    button {
+      background: var(--accent);
+      color: #000;
+      border: none;
+      padding: 10px 18px;
+      font-weight: 700;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 0.9rem;
+      transition: all 0.15s;
+    }
+    button:hover:not(:disabled) { background: var(--accent-dark); transform: translateY(-1px); }
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
+    button.secondary {
+      background: #1c1c22;
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+    .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+    textarea {
+      background: #0c0c10;
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 12px;
+      border-radius: 10px;
+      width: 100%;
+      font-family: inherit;
+      min-height: 110px;
+    }
+    .log {
+      background: #08080b;
+      border-radius: 10px;
+      padding: 14px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 0.82rem;
+      max-height: 240px;
+      overflow-y: auto;
+      color: #b0b0c0;
+      border: 1px solid #1a1a20;
+    }
+    .badge {
+      display: inline-block;
+      background: #1a1a20;
+      padding: 5px 12px;
+      border-radius: 999px;
+      font-size: 0.78rem;
+      color: var(--muted);
+    }
+    .progress {
+      height: 8px;
+      background: #1a1a20;
+      border-radius: 4px;
+      margin: 12px 0;
+      overflow: hidden;
+    }
+    .progress-bar {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), #00d4ff);
+      width: 0%;
+      transition: width 0.35s ease;
+    }
+    .token-list {
+      max-height: 260px;
+      overflow-y: auto;
+      margin: 10px 0;
+      font-size: 0.84rem;
+    }
+    .token-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 8px 0;
+      border-bottom: 1px solid #1a1a20;
+    }
+    .token-item input { accent-color: var(--accent); margin-top: 3px; }
+    .copy-btn {
+      background: #1c1c22;
+      color: var(--muted);
+      border: 1px solid var(--border);
+      padding: 2px 6px;
+      font-size: 0.7rem;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-left: 4px;
+    }
+    .copy-btn:hover { color: var(--accent); }
+    .guide { border-color: #1f3a2e; }
+    .leaderboard { border-color: #2a2a1f; }
+    .lb-item { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #1a1a20; font-size: 0.9rem; }
+    .lb-rank { color: var(--accent); font-weight: 700; width: 30px; }
+    footer { text-align: center; color: var(--muted); font-size: 0.85rem; margin-top: 36px; }
+    a { color: var(--accent); text-decoration: none; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="topbar">
+      <div class="brand">
+        <img class="logo" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KICA8ZGVmcz4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0idiIgeDE9IjAlIiB5MT0iMCUiIHgyPSIxMDAlIiB5Mj0iMTAwJSI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCUiIHN0eWxlPSJzdG9wLWNvbG9yOiMwMGZmOWQiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxMDAlIiBzdHlsZT0ic3RvcC1jb2xvcjojMDBjYzdhIi8+CiAgICA8L2xpbmVhckdyYWRpZW50PgogICAgPGxpbmVhckdyYWRpZW50IGlkPSJmaXJlIiB4MT0iMCUiIHkxPSIxMDAlIiB4Mj0iMCUiIHkyPSIwJSI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCUiIHN0eWxlPSJzdG9wLWNvbG9yOiNmZjQ1MDAiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSI1MCUiIHN0eWxlPSJzdG9wLWNvbG9yOiNmZjhjMDAiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxMDAlIiBzdHlsZT0ic3RvcC1jb2xvcjojZmZkNzAwIi8+CiAgICA8L2xpbmVhckdyYWRpZW50PgogIDwvZGVmcz4KICA8cGF0aCBkPSJNMjAgODAgTDUwIDIwIEw4MCA4MCBMNjUgODAgTDUwIDQ1IEwzNSA4MCBaIiBmaWxsPSJ1cmwoI3YpIiBzdHJva2U9IiMwMGZmOWQiIHN0cm9rZS13aWR0aD0iMiIvPgogIDxwYXRoIGQ9Ik00MCA3NSBRNTAgNTAgNjAgNzUgUTUwIDkwIDQwIDc1IiBmaWxsPSJ1cmwoI2ZpcmUpIi8+CiAgPHRleHQgeD0iNTAiIHk9Ijk1IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LXNpemU9IjgiIGZpbGw9IiMwMGZmOWQiIGZvbnQtZmFtaWx5PSJzYW5zLXNlcmlmIj5WRVg8L3RleHQ+Cjwvc3ZnPgo=" alt="VexInclinator logo">
+        <div class="brand-text">
+          <h1>VexInclinator</h1>
+          <p class="sub">Vexlore Ecosystem · 0% Fee</p>
+        </div>
+      </div>
+      <div class="wallet-controls">
+        <span id="wallet" class="badge">Not connected</span>
+        <button id="connect">Connect Wallet</button>
+        <button id="disconnect" class="secondary" style="display:none;">Disconnect</button>
+      </div>
+    </div>
+
+    <nav class="nav">
+      <a href="#how">How it works</a>
+      <a href="#leaderboard">Leaderboard</a>
+      <a href="#multi">Multi-Wallet</a>
+    </nav>
+
+    <div class="stats">
+      <div class="stat"><div class="stat-value" id="statAccounts">—</div><div class="stat-label">Empty Accounts</div></div>
+      <div class="stat"><div class="stat-value" id="statDust">—</div><div class="stat-label">Dust Tokens</div></div>
+      <div class="stat"><div class="stat-value" id="statSOL">0.000</div><div class="stat-label">Reclaimable SOL</div></div>
+    </div>
+
+    <div class="card">
+      <div class="row">
+        <button id="scan" class="secondary" disabled>Scan Wallet</button>
+        <button id="reclaimAll" disabled>Reclaim Selected (0% fee)</button>
+      </div>
+      <div class="progress"><div class="progress-bar" id="progress"></div></div>
+      <div id="tokenList" class="token-list" style="display:none;"></div>
+      <div id="log" class="log" style="margin-top:14px;">Ready. Connect your wallet to start.</div>
+    </div>
+
+    <div id="how" class="card guide">
+      <h3 style="margin:0 0 10px;">How it works</h3>
+      <p style="margin:0 0 8px; color:var(--muted);">Every time you buy or swap a token on Solana, a tiny account is created that locks about <strong>0.002 SOL</strong> as rent. If you trade even 2–3 tokens a day or week, those leftover accounts stay on-chain and the SOL stays locked forever — until you close them.</p>
+      <p style="margin:0 0 10px; color:var(--muted);">This tool only closes accounts that have exactly zero tokens. It never transfers, approves, or burns any token. Keys never leave your browser. Zero fee.</p>
+      <ol style="margin:10px 0 0 20px; padding:0;">
+        <li><strong>Connect</strong> any Solana wallet (Phantom, Solflare, Backpack, etc.).</li>
+        <li>Scan shows empty accounts that can be closed.</li>
+        <li>Uncheck anything you want to keep, then click <strong>Reclaim Selected</strong> and confirm in your wallet.</li>
+      </ol>
+      <p style="margin:10px 0 0; color:var(--danger); font-size:0.85rem;">If your wallet ever asks to approve or transfer any token (USDC etc.), reject it. This tool never does that.</p>
+    </div>
+
+    <div id="leaderboard" class="card leaderboard">
+      <h3 style="margin:0 0 6px;">Claim Leaderboard</h3>
+      <p style="margin:0 0 12px; color:var(--accent); font-size:0.9rem; font-weight:600;">This ranking system will be impacted soon — maybe an airdrop or gift.</p>
+      <div id="leaderboardList" style="font-family:monospace;"></div>
+      <p style="margin:12px 0 0; color:var(--muted); font-size:0.8rem;">Records stored locally in your browser for now. Global ranking coming.</p>
+    </div>
+
+    <div id="multi" class="card">
+      <h3 style="margin-top:0;">Multi-Wallet Scan <span class="badge">Read-only</span></h3>
+      <textarea id="addresses" placeholder="Paste public keys, one per line"></textarea>
+      <div class="row" style="margin-top:10px;">
+        <button id="scanMulti" class="secondary">Scan Addresses</button>
+      </div>
+      <div id="multiResults" style="margin-top:14px;"></div>
+    </div>
+
+    <footer>
+      <a href="https://github.com/robinnnn0101-ship-it/vex-inclinator" target="_blank">GitHub</a> · Part of Vexlore · 0% fee forever
+    </footer>
+  </div>
+
+  <script>
+    if (typeof solanaWeb3 === 'undefined') {
+      document.getElementById('log').innerHTML = '<div style="color:#ff5c5c">Error: Solana web3.js failed to load. Refresh the page.</div>';
+    }
+
+    const { Connection, PublicKey, Transaction, TransactionInstruction } = solanaWeb3;
+
+    const TOKEN_PROGRAM_ID = new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA');
+    const TOKEN_2022_PROGRAM_ID = new PublicKey('TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb');
+    const METADATA_PROGRAM_ID = new PublicKey('metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s');
+
+    const RPCS = [
+      'https://public.rpc.solanavibestation.com',
+      'https://rpc.solanatracker.io/public',
+      'https://solana.drpc.org',
+      'https://solana-mainnet.gateway.tatum.io',
+      'https://solana-rpc.publicnode.com',
+      'https://api.mainnet-beta.solana.com'
+    ];
+
+    let connection = new Connection(RPCS[0], 'confirmed');
+    let currentWallet = null;
+    let wallet = null;
+    let emptyAccounts = [];
+    let lastReclaimAmount = 0;
+
+    function detectWallets() {
+      const list = [];
+      if (window.solana?.isPhantom) {
+        list.push({ name: 'Phantom', provider: window.solana });
+      }
+      if (window.solflare) {
+        list.push({ name: 'Solflare', provider: window.solflare });
+      }
+      if (window.backpack) {
+        list.push({ name: 'Backpack', provider: window.backpack });
+      }
+      if (window.solana && !list.some(w => w.provider === window.solana)) {
+        const name = window.solana.isBackpack ? 'Backpack' : (window.solana.isSolflare ? 'Solflare' : 'Solana Wallet');
+        list.push({ name, provider: window.solana });
+      }
+      return list;
+    }
+
+    const logEl = document.getElementById('log');
+    const progressEl = document.getElementById('progress');
+    const connectBtn = document.getElementById('connect');
+    const disconnectBtn = document.getElementById('disconnect');
+    const walletBadge = document.getElementById('wallet');
+    const lbList = document.getElementById('leaderboardList');
+    const tokenListEl = document.getElementById('tokenList');
+
+    function log(msg) {
+      logEl.innerHTML += `<div>${new Date().toLocaleTimeString()} — ${msg}</div>`;
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    function setProgress(pct) { progressEl.style.width = pct + '%'; }
+
+    function copyText(text) {
+      navigator.clipboard.writeText(text).then(() => {
+        log('Copied: ' + text.slice(0, 8) + '...');
+      }).catch(() => {
+        log('Copy failed');
+      });
+    }
+    window.copyText = copyText;
+
+    function loadLeaderboard() {
+      try {
+        return JSON.parse(localStorage.getItem('vex_lb') || '{}');
+      } catch { return {}; }
+    }
+
+    function saveLeaderboard(data) {
+      localStorage.setItem('vex_lb', JSON.stringify(data));
+    }
+
+    function renderLeaderboard() {
+      const data = loadLeaderboard();
+      const entries = Object.entries(data)
+        .map(([addr, info]) => ({ addr, sol: info.sol || 0, claims: info.claims || 0 }))
+        .sort((a, b) => b.sol - a.sol)
+        .slice(0, 10);
+
+      if (!entries.length) {
+        lbList.innerHTML = '<div style="color:var(--muted);padding:8px 0;">No claims yet. Be the first.</div>';
+        return;
+      }
+
+      lbList.innerHTML = entries.map((e, i) =>
+        `<div class="lb-item">
+          <span class="lb-rank">#${i+1}</span>
+          <span>${e.addr.slice(0,4)}...${e.addr.slice(-4)}</span>
+          <span>${e.sol.toFixed(4)} SOL</span>
+          <span style="color:var(--muted);">${e.claims}x</span>
+        </div>`
+      ).join('');
+    }
+
+    function recordClaim(addr, solAmount) {
+      if (!addr || solAmount <= 0) return;
+      const data = loadLeaderboard();
+      if (!data[addr]) data[addr] = { sol: 0, claims: 0 };
+      data[addr].sol += solAmount;
+      data[addr].claims += 1;
+      saveLeaderboard(data);
+      renderLeaderboard();
+    }
+
+    renderLeaderboard();
+
+    async function withRpcFallback(fn) {
+      for (let i = 0; i < RPCS.length; i++) {
+        try {
+          connection = new Connection(RPCS[i], 'confirmed');
+          return await fn();
+        } catch (e) {
+          if (i === RPCS.length - 1) throw e;
+          log(`Trying next RPC...`);
+        }
+      }
+    }
+
+    function createCloseAccountInstruction(account, destination, owner, programId) {
+      return new TransactionInstruction({
+        programId,
+        keys: [
+          { pubkey: account, isSigner: false, isWritable: true },
+          { pubkey: destination, isSigner: false, isWritable: true },
+          { pubkey: owner, isSigner: true, isWritable: false }
+        ],
+        data: new Uint8Array([9])
+      });
+    }
+
+    function getMetadataPDA(mint) {
+      return PublicKey.findProgramAddressSync(
+        [Buffer.from('metadata'), METADATA_PROGRAM_ID.toBuffer(), mint.toBuffer()],
+        METADATA_PROGRAM_ID
+      )[0];
+    }
+
+    function parseMetadata(data) {
+      try {
+        let offset = 1 + 32 + 32;
+        const nameLen = new DataView(data.buffer, data.byteOffset + offset, 4).getUint32(0, true);
+        offset += 4;
+        const name = new TextDecoder().decode(data.slice(offset, offset + nameLen)).replace(/\0/g, '').trim();
+        offset += nameLen;
+        const symbolLen = new DataView(data.buffer, data.byteOffset + offset, 4).getUint32(0, true);
+        offset += 4;
+        const symbol = new TextDecoder().decode(data.slice(offset, offset + symbolLen)).replace(/\0/g, '').trim();
+        return { name: name || null, symbol: symbol || null };
+      } catch {
+        return { name: null, symbol: null };
+      }
+    }
+
+    async function fetchMetadata(mint) {
+      try {
+        const pda = getMetadataPDA(mint);
+        const info = await connection.getAccountInfo(pda);
+        if (!info || !info.data) return { name: null, symbol: null };
+        return parseMetadata(info.data);
+      } catch {
+        return { name: null, symbol: null };
+      }
+    }
+
+    function setConnected(pub, walletName) {
+      wallet = pub;
+      walletBadge.textContent = (walletName ? walletName + ' · ' : '') + pub.toString().slice(0, 4) + '...' + pub.toString().slice(-4);
+      connectBtn.style.display = 'none';
+      disconnectBtn.style.display = 'inline-block';
+      document.getElementById('scan').disabled = false;
+    }
+
+    function setDisconnected() {
+      wallet = null;
+      currentWallet = null;
+      walletBadge.textContent = 'Not connected';
+      connectBtn.style.display = 'inline-block';
+      disconnectBtn.style.display = 'none';
+      document.getElementById('scan').disabled = true;
+      document.getElementById('reclaimAll').disabled = true;
+      document.getElementById('statAccounts').textContent = '—';
+      document.getElementById('statDust').textContent = '—';
+      document.getElementById('statSOL').textContent = '0.000';
+      tokenListEl.style.display = 'none';
+      tokenListEl.innerHTML = '';
+    }
+
+    setTimeout(() => {
+      const available = detectWallets();
+      if (available.length) {
+        log(`Detected wallets: ${available.map(w => w.name).join(', ')}`);
+      }
+    }, 800);
+
+    connectBtn.onclick = async () => {
+      const available = detectWallets();
+      if (!available.length) {
+        alert('No Solana wallet detected. Install Phantom, Solflare or Backpack.');
+        window.open('https://phantom.app/', '_blank');
+        return;
+      }
+      let chosen = available[0];
+      if (available.length > 1) {
+        const names = available.map((w, i) => `${i + 1}. ${w.name}`).join('\n');
+        const pick = prompt(`Multiple wallets found. Enter number:\n${names}`, '1');
+        const idx = parseInt(pick, 10) - 1;
+        if (isNaN(idx) || idx < 0 || idx >= available.length) return;
+        chosen = available[idx];
+      }
+      currentWallet = chosen;
+      try {
+        await chosen.provider.connect();
+        const pub = chosen.provider.publicKey;
+        if (pub) {
+          setConnected(pub, chosen.name);
+          log(`${chosen.name} connected`);
+          setTimeout(() => document.getElementById('scan').click(), 400);
+        }
+      } catch (e) {
+        log('Connect failed: ' + (e.message || e));
+        currentWallet = null;
+      }
+    };
+
+    disconnectBtn.onclick = async () => {
+      try {
+        if (currentWallet?.provider?.disconnect) await currentWallet.provider.disconnect();
+      } catch {}
+      setDisconnected();
+      log('Wallet disconnected');
+    };
+
+    async function getAccounts(owner) {
+      return await withRpcFallback(async () => {
+        const empties = [];
+        for (const programId of [TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID]) {
+          const parsed = await connection.getParsedTokenAccountsByOwner(owner, { programId });
+          for (const acc of parsed.value) {
+            const info = acc.account.data.parsed.info;
+            const amount = BigInt(info.tokenAmount.amount);
+            if (amount !== 0n) continue;
+            const item = {
+              pubkey: acc.pubkey,
+              mint: new PublicKey(info.mint),
+              programId,
+              lamports: acc.account.lamports,
+              amount: 0n,
+              selected: true,
+              name: null,
+              symbol: null
+            };
+            empties.push(item);
+          }
+        }
+        return { empties };
+      });
+    }
+
+    function renderTokenList() {
+      const all = emptyAccounts;
+      if (!all.length) {
+        tokenListEl.style.display = 'none';
+        return;
+      }
+      tokenListEl.style.display = 'block';
+      tokenListEl.innerHTML = all.map((a, i) => {
+        const acct = a.pubkey.toString();
+        const mint = a.mint.toString();
+        const sol = (a.lamports / 1e9).toFixed(4);
+        const title = a.symbol ? `${a.name || 'Unknown'} ($${a.symbol})` : (a.name || 'Empty');
+        return `<div class="token-item">
+          <input type="checkbox" checked onchange="emptyAccounts[${i}].selected = this.checked">
+          <div>
+            <div>${title} · ${sol} SOL</div>
+            <div style="font-size:0.75rem;color:var(--muted);">Acct: ${acct.slice(0,6)}...${acct.slice(-4)} <button class="copy-btn" onclick="copyText('${acct}')">copy</button></div>
+            <div style="font-size:0.75rem;color:var(--muted);">Mint: ${mint.slice(0,6)}...${mint.slice(-4)} <button class="copy-btn" onclick="copyText('${mint}')">copy</button></div>
+          </div>
+        </div>`;
+      }).join('');
+    }
+
+    async function enrichMetadata() {
+      for (const a of emptyAccounts) {
+        const meta = await fetchMetadata(a.mint);
+        a.name = meta.name;
+        a.symbol = meta.symbol;
+      }
+      renderTokenList();
+    }
+
+    document.getElementById('scan').onclick = async () => {
+      if (!wallet) return;
+      log('Scanning...');
+      setProgress(20);
+      try {
+        const { empties } = await getAccounts(wallet);
+        emptyAccounts = empties;
+        document.getElementById('statAccounts').textContent = empties.length;
+        document.getElementById('statDust').textContent = '0';
+        const total = empties.reduce((s, a) => s + a.lamports, 0);
+        document.getElementById('statSOL').textContent = (total / 1e9).toFixed(4);
+        document.getElementById('reclaimAll').disabled = empties.length === 0;
+        renderTokenList();
+        log(`Found ${empties.length} empty accounts`);
+        setProgress(60);
+        log('Fetching token names...');
+        await enrichMetadata();
+        setProgress(100);
+        setTimeout(() => setProgress(0), 800);
+      } catch (e) {
+        log('Scan error: ' + (e.message || e));
+        setProgress(0);
+      }
+    };
+
+    async function sendBatches(instructionsList, label) {
+      const BATCH = 3;
+      const provider = currentWallet?.provider;
+      if (!provider) throw new Error('No wallet connected');
+
+      for (let i = 0; i < instructionsList.length; i += BATCH) {
+        const batch = instructionsList.slice(i, i + BATCH);
+        const tx = new Transaction();
+        batch.forEach(ix => tx.add(ix));
+        tx.feePayer = wallet;
+
+        try {
+          const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed');
+          tx.recentBlockhash = blockhash;
+          tx.lastValidBlockHeight = lastValidBlockHeight;
+
+          let sig;
+          if (typeof provider.signAndSendTransaction === 'function') {
+            sig = await provider.signAndSendTransaction(tx);
+          } else if (typeof provider.signTransaction === 'function') {
+            const signed = await provider.signTransaction(tx);
+            sig = await connection.sendRawTransaction(signed.serialize(), { skipPreflight: false });
+          } else {
+            throw new Error('Wallet does not support signing');
+          }
+
+          await connection.confirmTransaction({ signature: sig, blockhash, lastValidBlockHeight }, 'confirmed');
+          log(`${label} batch ${Math.floor(i/BATCH)+1} confirmed`);
+        } catch (e) {
+          const msg = e.message || String(e);
+          log(`${label} batch failed: ${msg}`);
+          throw e;
+        }
+      }
+    }
+
+    document.getElementById('reclaimAll').onclick = async () => {
+      if (!wallet) return;
+      const selected = emptyAccounts.filter(a => a.selected && a.amount === 0n);
+      if (selected.length === 0) {
+        alert('Nothing selected');
+        return;
+      }
+      if (!confirm('Close selected empty accounts and reclaim SOL? Only zero-balance accounts will be closed. No tokens will be transferred or approved.')) return;
+
+      log('Starting reclaim...');
+      setProgress(10);
+
+      try {
+        const reclaimed = selected.reduce((s, a) => s + a.lamports, 0) / 1e9;
+        const closeIxs = selected.map(a => createCloseAccountInstruction(a.pubkey, wallet, wallet, a.programId));
+        await sendBatches(closeIxs, 'Close accounts');
+        setProgress(100);
+
+        if (wallet && reclaimed > 0) {
+          recordClaim(wallet.toString(), reclaimed);
+          log(`Recorded ${reclaimed.toFixed(4)} SOL on leaderboard`);
+        }
+
+        log('Done. SOL reclaimed (0% fee).');
+        setTimeout(() => document.getElementById('scan').click(), 1500);
+      } catch (e) {
+        log('Reclaim stopped: ' + (e.message || String(e)));
+        setProgress(0);
+      }
+    };
+
+    document.getElementById('scanMulti').onclick = async () => {
+      const text = document.getElementById('addresses').value;
+      const lines = text.split(/\n+/).map(l => l.trim()).filter(Boolean);
+      const out = document.getElementById('multiResults');
+      if (!lines.length) { out.innerHTML = '<div style="color:var(--muted)">No addresses</div>'; return; }
+      out.innerHTML = '<div>Scanning...</div>';
+      let html = "<div style='font-family:monospace;font-size:0.88rem;line-height:1.6;'>";
+      for (const line of lines) {
+        try {
+          const pk = new PublicKey(line);
+          const { empties } = await getAccounts(pk);
+          const total = empties.reduce((s, a) => s + a.lamports, 0);
+          html += `<div>${line.slice(0,6)}...${line.slice(-4)} → ${empties.length} empty → ${(total/1e9).toFixed(4)} SOL</div>`;
+        } catch (e) {
+          html += `<div style='color:#ff5c5c'>${line.slice(0,24)}... → error</div>`;
+        }
+      }
+      out.innerHTML = html + '</div>';
+    };
+  </script>
+</body>
+</html>
