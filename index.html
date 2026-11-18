@@ -493,33 +493,41 @@
       return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
     }
 
-    function openInWalletBrowser(wallet) {
+    window.openInWalletBrowser = function openInWalletBrowser(wallet) {
       const url = encodeURIComponent(window.location.href);
       const origin = encodeURIComponent(window.location.origin);
       let link = '';
       if (wallet === 'phantom') {
-        link = `https://phantom.app/ul/browse/${url}?ref=${origin}`;
+        link = `https://phantom.com/ul/browse/${url}?ref=${origin}`;
       } else if (wallet === 'solflare') {
         link = `https://solflare.com/ul/v1/browse/${url}?ref=${origin}`;
       } else if (wallet === 'backpack') {
-        link = `https://backpack.app/ul/browse/${url}?ref=${origin}`;
+        link = `https://backpack.app/ul/v1/browse/${url}?ref=${origin}`;
       }
       if (link) window.location.href = link;
+    }
+
+    function showMobileWalletButtons() {
+      const controls = document.querySelector('.wallet-controls');
+      if (!controls || document.getElementById('mobile-wallets')) return;
+      const box = document.createElement('div');
+      box.id = 'mobile-wallets';
+      box.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;width:100%;';
+      box.innerHTML = `
+        <button onclick="openInWalletBrowser('phantom')" style="flex:1;min-width:100px;">Open in Phantom</button>
+        <button onclick="openInWalletBrowser('solflare')" style="flex:1;min-width:100px;">Open in Solflare</button>
+        <button onclick="openInWalletBrowser('backpack')" style="flex:1;min-width:100px;">Open in Backpack</button>
+      `;
+      controls.parentNode.insertBefore(box, controls.nextSibling);
+      log('On phone: tap a button above to open this page inside your wallet app');
     }
 
     connectBtn.onclick = async () => {
       const available = detectWallets();
 
-      // Mobile with no injected provider → open inside wallet browser
+      // Mobile with no injected provider → show buttons to open in wallet browser
       if (!available.length && isMobile()) {
-        const choice = prompt(
-          'Open this page inside your wallet app for best results:\n\n' +
-          '1. Phantom\n2. Solflare\n3. Backpack\n\nEnter number:',
-          '1'
-        );
-        if (choice === '1') openInWalletBrowser('phantom');
-        else if (choice === '2') openInWalletBrowser('solflare');
-        else if (choice === '3') openInWalletBrowser('backpack');
+        showMobileWalletButtons();
         return;
       }
 
