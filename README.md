@@ -9,11 +9,14 @@ Reclaim **100%** of locked SOL. No fees. Non-custodial. Open source.
 - Detect & burn dust / spam tokens then reclaim
 - Withdraw excess lamports (post-2026 rent reduction)
 - Batch operations with progress
+- Multi-wallet support (Phantom, Solflare, Backpack & other Solana wallets)
 - Multi-wallet read-only scan
-- Clean professional UI
+- Clean professional UI with Vex + fire logo
 - Priority fee aware
 
 ## Live
+https://robinnnn0101-ship-it.github.io/vex-inclinator/
+
 Host `index.html` on Vercel, Netlify, GitHub Pages, or open locally.
 
 ## Why better
